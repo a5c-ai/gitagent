@@ -2,7 +2,7 @@
 # This Dockerfile creates an optimized production image with security best practices
 
 # Build stage
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 # Set build arguments
 ARG BUILDPLATFORM
@@ -41,7 +41,6 @@ RUN npm install -g @anthropic-ai/claude-code
 
 RUN npm install -g @google/gemini-cli
 
-
 # Create CLI tools directory and set up symlinks for easier access
 RUN mkdir -p /opt/cli-tools/bin && \
     ln -s /usr/bin/codex /opt/cli-tools/bin/codex && \
@@ -49,7 +48,7 @@ RUN mkdir -p /opt/cli-tools/bin && \
     ln -s /opt/venv/bin/gemini-cli /opt/cli-tools/bin/gemini
 
 # Production stage
-FROM python:3.11-slim as production
+FROM python:3.11-slim AS production
 
 # Set metadata labels
 LABEL maintainer="Tal Muskal <tal@a5c.ai>"
@@ -74,8 +73,8 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean
 
 # Create non-root user for security
-RUN groupadd -r github-handler && \
-    useradd -r -g github-handler -d /app -s /bin/bash -c "gitagent" github-handler
+RUN groupadd -r gitagent && \
+    useradd -r -g gitagent -d /app -s /bin/bash -c "gitagent" gitagent
 
 # Set working directory
 WORKDIR /app
@@ -92,11 +91,11 @@ COPY --from=builder /app/build/src ./src
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/logs /app/data /app/config && \
-    chown -R github-handler:github-handler /app && \
+    chown -R gitagent:gitagent /app && \
     chmod -R 755 /app
 
 # Switch to non-root user
-USER github-handler
+USER gitagent
 
 # Set environment variables
 ENV PATH="/opt/venv/bin:/opt/cli-tools/bin:/usr/lib/node_modules/.bin:$PATH" \
@@ -130,7 +129,7 @@ ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["python", "-m", "gitagent.main"]
 
 # Development stage (optional)
-FROM production as development
+FROM production AS development
 
 # Switch back to root for development tools installation
 USER root
@@ -161,7 +160,7 @@ USER gitagent
 CMD ["python", "-m", "gitagent.main", "--debug", "--reload"]
 
 # Testing stage
-FROM builder as testing
+FROM builder AS testing
 
 # Install test dependencies (virtual environment already activated from builder)
 RUN pip install --no-cache-dir .[test]
@@ -173,7 +172,7 @@ COPY tests/ ./tests/
 RUN python -m pytest tests/ -v --cov=src/gitagent --cov-report=xml --cov-report=term-missing
 
 # Final production stage
-FROM production as final
+FROM production AS final
 
 # Re-declare metadata for final stage
 LABEL org.opencontainers.image.title="gitagent"
