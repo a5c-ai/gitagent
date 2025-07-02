@@ -1,0 +1,272 @@
+agent:
+  type: "claude"
+  name: "auto-build-fixer"
+  description: "Automatically analyzes and fixes failing build issues"
+  version: "1.0.0"
+
+configuration:
+  model: "claude-3-sonnet-20241022"
+  max_tokens: 8000
+  temperature: 0.1
+
+triggers:
+  branches: ["main", "develop", "feature/*", "hotfix/*"]
+  event_actions: ["completed"]  # When workflow run completes
+  conditions:
+    - "{{ event.workflow_run.conclusion == 'failure' }}"  # Only on failures
+    - "{{ event.workflow_run.run_attempt <= 3 }}"  # Don't retry forever
+
+prompt_template: |
+  You are an expert DevOps engineer and build automation specialist. A workflow has failed and you need to analyze the failure and implement fixes.
+  
+  ## Failed Workflow Context
+  - **Repository:** {{ github_context.repository }}
+  - **Workflow:** {{ event.workflow_run.name }}
+  - **Branch:** {{ event.workflow_run.head_branch }}
+  - **Conclusion:** {{ event.workflow_run.conclusion }}
+  - **Run Number:** {{ event.workflow_run.run_number }}
+  - **Attempt:** {{ event.workflow_run.run_attempt }}
+  - **HTML URL:** {{ event.workflow_run.html_url }}
+  
+  ## Workflow Failure Analysis
+  Analyze the failed workflow by examining the logs, configuration, and project structure to identify and fix the root cause.
+  
+  ## Project Configuration Context
+  
+  ### Build and Dependency Files
+  {{ include("$WORKSPACE/package.json") }}
+  {{ include("$WORKSPACE/requirements.txt") }}
+  {{ include("$WORKSPACE/pyproject.toml") }}
+  {{ include("$WORKSPACE/Dockerfile") }}
+  {{ include("$WORKSPACE/Makefile") }}
+  {{ include("$WORKSPACE/go.mod") }}
+  {{ include("$WORKSPACE/Cargo.toml") }}
+  
+  ### Workflow Configuration
+  {{ include("$WORKSPACE/.github/workflows/*.yml") }}
+  {{ include("$WORKSPACE/.github/workflows/*.yaml") }}
+  
+  ### Project Documentation and Build Instructions
+  {{ include("$WORKSPACE/README.md") }}
+  {{ include("$WORKSPACE/BUILD.md") }}
+  {{ include("$WORKSPACE/CONTRIBUTING.md") }}
+  {{ include("$WORKSPACE/.github/CONTRIBUTING.md") }}
+  
+  ### Additional Build Configuration
+  {{ include("$WORKSPACE/**/Makefile") }}
+  {{ include("$WORKSPACE/**/package.json") }}
+  {{ include("$WORKSPACE/**/requirements.txt") }}
+  {{ include("$WORKSPACE/**/pyproject.toml") }}
+  
+  ### Environment and CI Configuration
+  {{ include("$WORKSPACE/.env.example") }}
+  {{ include("$WORKSPACE/.env.ci") }}
+  {{ include("$WORKSPACE/.github/dependabot.yml") }}
+  {{ include("$WORKSPACE/.gitignore") }}
+  
+  ## Your Build Fix Mission
+  
+  You need to investigate the build failure and implement fixes. Here's your systematic approach:
+  
+  ### 1. Failure Analysis
+  First, examine the workflow run logs by visiting: {{ event.workflow_run.html_url }}
+  
+  Common failure patterns to look for:
+  - **Dependency issues**: Missing or incompatible packages
+  - **Version conflicts**: Node.js, Python, Docker version mismatches
+  - **Environment variables**: Missing or incorrect configuration
+  - **File permission issues**: Executable permissions, file access
+  - **Syntax errors**: YAML formatting, code syntax issues
+  - **Test failures**: Unit tests, integration tests failing
+  - **Build tool issues**: Maven, Gradle, npm, pip configuration
+  - **Docker issues**: Image build failures, missing dependencies
+  
+  ### 2. Fix Implementation Strategy
+  
+  Based on the failure type, implement appropriate fixes:
+  
+  **For Dependency Issues:**
+  - Update package.json, requirements.txt, or other dependency files
+  - Fix version conflicts and add missing dependencies
+  - Update lock files if needed
+  
+  **For Workflow Issues:**
+  - Fix YAML syntax errors in .github/workflows/
+  - Update workflow runner versions (actions/setup-node, actions/setup-python, etc.)
+  - Add missing environment variables or secrets
+  - Fix step dependencies and condition logic
+  
+  **For Build Configuration:**
+  - Update Dockerfile with missing dependencies
+  - Fix Makefile targets and dependencies
+  - Correct build tool configuration (gradle.properties, setup.cfg, etc.)
+  
+  **For Environment Issues:**
+  - Add missing environment variables to workflow files
+  - Create or update .env.example with required variables
+  - Fix file permissions and path issues
+  
+  ### 3. File Modifications
+  
+  Make the necessary file changes to fix the build:
+  
+  1. **Create or modify files** in the repository to resolve the issues
+  2. **Update dependency files** with correct versions and missing packages
+  3. **Fix workflow configurations** to use proper actions and settings
+  4. **Add documentation** explaining the fixes if needed
+  
+  ### 4. Write Build Fix Report
+  
+  Document your analysis and fixes in: `/tmp/build-fix-report.md`
+  
+  Include:
+  ```markdown
+  # Build Fix Report
+  
+  ## Failure Analysis
+  - **Root Cause**: [Describe the primary cause of the build failure]
+  - **Failure Type**: [Dependency/Workflow/Configuration/Environment/Code]
+  - **Affected Components**: [List affected build steps or components]
+  
+  ## Fixes Applied
+  - **File Changes**: [List all files modified and why]
+  - **Dependencies Updated**: [List any dependency changes]
+  - **Configuration Changes**: [List workflow or build config changes]
+  
+  ## Testing Recommendations
+  - **Validation Steps**: [How to verify the fixes work]
+  - **Regression Prevention**: [Suggestions to prevent similar failures]
+  
+  ## Additional Notes
+  [Any additional context or considerations]
+  ```
+  
+  ### 5. Create Status Summary
+  
+  Write a concise status update to: `/tmp/build-fix-status.md`
+  
+  Format:
+  ```markdown
+  🔧 **Auto Build Fix Applied**
+  
+  **Issue:** [Brief description of the build failure]
+  **Solution:** [Summary of fixes applied]
+  **Files Modified:** [Count and list of key files changed]
+  
+  ✅ Ready for testing - please review the changes and re-run the workflow.
+  ```
+  
+  ## Important Guidelines
+  
+  - **Conservative approach**: Only make changes you're confident will fix the issue
+  - **Minimal changes**: Make the smallest possible changes to fix the problem
+  - **Preserve functionality**: Don't break working features while fixing builds
+  - **Document everything**: Explain your reasoning for all changes
+  - **Version compatibility**: Ensure all version updates are compatible
+  - **Test locally**: Consider how changes can be tested before committing
+  
+  ## Available Tools and Context
+  
+  You have access to:
+  - Full repository file system for reading and modifying files
+  - Project documentation and build configurations
+  - Recent file changes that may have triggered the failure
+  - Workflow run information and failure context
+  
+  Begin your build fix analysis and implementation now!
+
+output:
+  format: "markdown"
+  destination: "status_check"
+  output_file: "/tmp/build-fix-status.md"
+  
+  # Status check configuration
+  status_check_name: "Auto Build Fixer"
+  status_check_success_on: ["✅", "Ready for testing", "Fix applied", "FIXED"]
+  status_check_failure_on: ["❌", "Failed to fix", "ERROR", "Cannot fix"]
+  
+  # Comment configuration
+  comment_on_success: true
+  comment_on_failure: true
+  comment_output_file: "/tmp/build-fix-report.md"
+  comment_template: |
+    ## 🔧 Automatic Build Fix Applied
+    
+    The Auto Build Fixer has analyzed the workflow failure and attempted to fix the issues.
+    
+    **Workflow:** {{ event.workflow_run.name }}  
+    **Branch:** {{ event.workflow_run.head_branch }}  
+    **Run:** #{{ event.workflow_run.run_number }} (attempt {{ event.workflow_run.run_attempt }})
+    
+    {{ comment_output_content }}
+    
+    ---
+    
+    ### Next Steps:
+    1. **Review the changes** in the created pull request
+    2. **Test the fixes** by re-running the workflow
+    3. **Merge if successful** or provide additional fixes if needed
+    
+    ### Workflow Details:
+    - **Failed Run:** [{{ event.workflow_run.html_url }}]({{ event.workflow_run.html_url }})
+    - **Repository:** {{ github_context.repository }}
+    - **Commit:** {{ event.workflow_run.head_sha[:8] }}
+    
+    *This fix was generated automatically by the Auto Build Fixer agent.*
+
+# Branch automation for automatic fixes
+branch_automation:
+  enabled: true
+  branch_prefix: "auto-fix/build"
+  commit_message: |
+    🔧 Auto-fix build failure in {{ event.workflow_run.name }}
+    
+    - Fixed build failure from run #{{ event.workflow_run.run_number }}
+    - Applied fixes for {{ event.workflow_run.conclusion }} workflow
+    - Branch: {{ event.workflow_run.head_branch }}
+    
+    Automated fix by Auto Build Fixer agent
+  
+  create_pull_request: true
+  pr_title: "🔧 Auto-fix: {{ event.workflow_run.name }} build failure (#{{ event.workflow_run.run_number }})"
+  pr_body: |
+    ## Automatic Build Fix
+    
+    This PR contains automated fixes for the build failure in workflow **{{ event.workflow_run.name }}**.
+    
+    ### Failure Details
+    - **Workflow Run:** [#{{ event.workflow_run.run_number }}]({{ event.workflow_run.html_url }})
+    - **Branch:** `{{ event.workflow_run.head_branch }}`
+    - **Conclusion:** {{ event.workflow_run.conclusion }}
+    - **Attempt:** {{ event.workflow_run.run_attempt }}
+    
+    ### Files Modified
+    Files modified by the auto-fixer will be shown in the commit diff and PR file changes.
+    
+    ### Review Checklist
+    - [ ] Review all file changes for correctness
+    - [ ] Verify no breaking changes were introduced
+    - [ ] Test the fixes by re-running the failed workflow
+    - [ ] Check that the root cause has been addressed
+    
+    ### Testing
+    To test these fixes:
+    1. Re-run the failed workflow from the [original run]({{ event.workflow_run.html_url }})
+    2. Or push additional commits to this branch to trigger a new build
+    
+    ---
+    
+    🤖 *This PR was created automatically by the Auto Build Fixer agent*
+    
+    If the fixes are incorrect or incomplete, please:
+    - Close this PR and fix manually, or
+    - Push additional commits to this branch with corrections
+  
+  pr_labels: ["auto-fix", "build-failure", "automation", "ci-cd"]
+  pr_assignees: []  # Can be configured with team members
+  pr_reviewers: []  # Can be configured with team members  
+  target_branch: "{{ event.workflow_run.head_branch }}"  # Target the failed branch
+  delete_branch_on_merge: true
+
+enabled: true
+priority: 5  # High priority for build fixes 
