@@ -2,7 +2,7 @@
 # This Dockerfile creates an optimized production image with security best practices
 
 # Build stage
-FROM python:3.11-slim AS builder
+FROM python:3.11-bookworm AS builder
 
 # Set build arguments
 ARG BUILDPLATFORM
@@ -45,7 +45,7 @@ RUN mkdir -p /opt/cli-tools/bin && \
     ln -s /opt/venv/bin/gemini-cli /opt/cli-tools/bin/gemini
 
 # Production stage
-FROM python:3.11-slim AS production
+FROM python:3.11-bookworm AS production
 
 # Set metadata labels
 LABEL maintainer="Tal Muskal <tal@a5c.ai>"
