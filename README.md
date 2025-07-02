@@ -217,9 +217,9 @@ priority: 10  # Lower = higher priority
 
 The Docker image includes pre-installed CLI tools for all supported AI providers:
 
-- **OpenAI Codex CLI** (`codex`): Official OpenAI CLI with advanced coding capabilities and sandbox execution
-- **Claude CLI** (`claude`): Community-maintained CLI for Anthropic's Claude models
-- **Gemini CLI** (`gemini`): Community-maintained CLI for Google's Gemini models
+- **OpenAI Codex CLI** (`codex`)
+- **Claude Code** (`claude`)
+- **Gemini CLI** (`gemini`)
 
 These tools are available system-wide and can be used directly in agent configurations without specifying executable paths.
 

@@ -1,7 +1,7 @@
 agent:
   type: "claude"
   name: "file-inclusion-demo"
-  description: "Demonstrates advanced file inclusion capabilities with built-in Claude CLI"
+  description: "Demonstrates advanced file inclusion capabilities with built-in Claude Code"
   version: "1.0.0"
   executable: "claude"  # Built-in CLI tool - no path required
 
@@ -83,7 +83,7 @@ branch_automation:
   pr_body: |
     ## Automated Code Review Fixes
     
-    This PR contains automated fixes identified during code review using the built-in Claude CLI.
+    This PR contains automated fixes identified during code review using the built-in Claude Code.
     
     ### Files Modified
     {% for file in files_changed %}

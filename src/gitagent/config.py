@@ -108,7 +108,7 @@ class Settings(BaseSettings):
     # Agent CLI Configurations
     codex_cli: Optional[AgentCliConfiguration] = Field(None, description="Codex/OpenAI CLI configuration")
     gemini_cli: Optional[AgentCliConfiguration] = Field(None, description="Gemini CLI configuration")
-    claude_cli: Optional[AgentCliConfiguration] = Field(None, description="Claude CLI configuration")
+    claude_cli: Optional[AgentCliConfiguration] = Field(None, description="Claude Code configuration")
     custom_cli: Optional[AgentCliConfiguration] = Field(None, description="Custom CLI configuration")
     
     # Agent CLI Environment Variables
@@ -248,7 +248,7 @@ class Settings(BaseSettings):
                 timeout_seconds=300
             )
         
-        # Claude CLI configuration
+        # Claude Code configuration
         if not self.claude_cli and (self.claude_api_key or self.anthropic_api_key):
             self.claude_cli = AgentCliConfiguration(
                 executable_path="claude",

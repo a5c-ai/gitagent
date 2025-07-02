@@ -1,7 +1,7 @@
 agent:
   type: "claude"
   name: "code-reviewer"
-  description: "Automated code reviewer using built-in Claude CLI to analyze changes and provide feedback"
+  description: "Automated code reviewer using built-in Claude Code to analyze changes and provide feedback"
   version: "1.0.0"
   executable: "claude"  # Built-in CLI tool - no path required
 

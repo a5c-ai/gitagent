@@ -31,15 +31,16 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir .
 
+    # install node and npm version 
+RUN apt-get update && apt-get install -y nodejs npm && rm -rf /var/lib/apt/lists/*
+
 # Install AI CLI tools
-# OpenAI Codex CLI (official)
-RUN npm install -g @openai/codex
+RUN npm i -g @openai/codex@native
 
-# Anthropic Claude CLI (community tool)
-RUN pip install --no-cache-dir git+https://github.com/dvcrn/anthropic-cli.git
+RUN npm install -g @anthropic-ai/claude-code
 
-# Gemini CLI (community tool)
-RUN pip install --no-cache-dir gemini-cli
+RUN npm install -g @google/gemini-cli
+
 
 # Create CLI tools directory and set up symlinks for easier access
 RUN mkdir -p /opt/cli-tools/bin && \
@@ -191,7 +192,7 @@ USER gitagent
 # Verify dependencies and installation
 RUN python -c "import gitagent; print('gitagent and dependencies installed successfully')" && \
     codex --version && echo "OpenAI Codex CLI installed successfully" && \
-    claude --help && echo "Claude CLI installed successfully" && \
+    claude --help && echo "Claude Code installed successfully" && \
     gemini --help && echo "Gemini CLI installed successfully"
 
 # Default command
