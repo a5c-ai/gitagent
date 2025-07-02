@@ -23,7 +23,9 @@ WORKDIR /app/build
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
 
-# Install Python dependencies
+# Install Python dependencies to a virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir .
 
@@ -57,9 +59,8 @@ RUN groupadd -r github-handler && \
 # Set working directory
 WORKDIR /app
 
-# Copy Python packages from builder stage
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# Copy virtual environment from builder stage
+COPY --from=builder /opt/venv /opt/venv
 
 # Copy application source
 COPY --from=builder /app/build/src ./src
@@ -73,7 +74,8 @@ RUN mkdir -p /app/logs /app/data /app/config && \
 USER github-handler
 
 # Set environment variables
-ENV PYTHONPATH=/app/src \
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     HOME=/app
@@ -136,7 +138,7 @@ CMD ["python", "-m", "github_action_handler.main", "--debug", "--reload"]
 # Testing stage
 FROM builder as testing
 
-# Install test dependencies
+# Install test dependencies (virtual environment already activated from builder)
 RUN pip install --no-cache-dir .[test]
 
 # Copy test files
@@ -162,8 +164,8 @@ LABEL org.opencontainers.image.revision=${VCS_REF}
 # Final security check - ensure we're running as non-root
 USER github-handler
 
-# Verify installation
-RUN python -c "import github_action_handler; print('GitHub Action Handler installed successfully')"
+# Verify dependencies and installation
+RUN python -c "import github_action_handler; print('GitHub Action Handler and dependencies installed successfully')"
 
 # Default command
 CMD ["python", "-m", "github_action_handler.main"] 
