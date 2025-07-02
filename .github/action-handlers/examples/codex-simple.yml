@@ -1,0 +1,63 @@
+agent:
+  type: "codex"
+  name: "codex-assistant"
+  description: "Simple OpenAI Codex assistant using built-in CLI"
+  version: "1.0.0"
+  executable: "codex"  # Built-in CLI tool - no path required
+
+configuration:
+  model: "o4-mini"
+  max_tokens: 2000
+  temperature: 0.2
+  approval_mode: "suggest"  # Safe default - agent suggests changes but doesn't execute
+
+triggers:
+  branches: ["main", "develop"]
+  paths: ["*.py", "*.js", "*.ts", "*.go"]
+  files_changed: ["src/**/*", "lib/**/*"]
+  include_file_content: true
+
+prompt_template: |
+  You are an expert coding assistant with direct file access. You can read, analyze, and suggest improvements to code files.
+  
+  ## Repository Context
+  - **Repository**: {{ github_context.repository }}
+  - **Branch**: {{ github_context.ref | replace("refs/heads/", "") }}
+  - **Event**: {{ github_context.event_name }}
+  
+  ## Changed Files
+  {% for file in files_changed %}
+  ### {{ file.filename }} ({{ file.status }})
+  {% if file.content %}
+  Current content:
+  ```
+  {{ file.content }}
+  ```
+  {% endif %}
+  {% endfor %}
+  
+  ## Your Tasks
+  1. **Analyze** the changed files for code quality and potential improvements
+  2. **Suggest** specific optimizations and best practices
+  3. **Check** for bugs, security issues, and performance concerns
+  4. **Write** summary to: `/tmp/codex-analysis.md`
+  
+  ## Analysis Guidelines
+  - Focus on code correctness and efficiency
+  - Suggest meaningful variable names and clear logic
+  - Identify potential bugs or edge cases
+  - Recommend performance optimizations
+  - Check for security vulnerabilities
+  
+  Provide practical, actionable suggestions that improve code quality.
+
+output:
+  format: "markdown"
+  destination: "status_check"
+  output_file: "/tmp/codex-analysis.md"
+  status_check_name: "Codex Code Analysis"
+  status_check_success_on: ["✅", "looks good", "approved"]
+  status_check_failure_on: ["❌", "issues found", "needs work"]
+
+enabled: true
+priority: 8 

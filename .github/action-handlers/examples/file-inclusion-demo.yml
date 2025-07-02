@@ -1,111 +1,98 @@
 agent:
   type: "claude"
   name: "file-inclusion-demo"
-  description: "Demonstrates advanced file inclusion with wildcards and relative paths"
+  description: "Demonstrates advanced file inclusion capabilities with built-in Claude CLI"
   version: "1.0.0"
+  executable: "claude"  # Built-in CLI tool - no path required
 
 configuration:
   model: "claude-3-sonnet-20241022"
-  max_tokens: 6000
+  max_tokens: 4000
   temperature: 0.1
 
 triggers:
-  branches: ["main", "develop", "feature/*"]
-  event_actions: ["opened", "synchronize"]
-  
-  # Monitor code file changes
-  files_changed: ["src/**/*.py", "lib/**/*.js", "docs/**/*.md"]
+  branches: ["main", "develop"]
+  files_changed: ["src/**/*.py", "docs/**/*.md"]
   include_file_content: true
   include_file_diff: true
-  file_diff_context: 3
 
 prompt_template: |
-  You are an expert code analyst with access to project documentation and configuration files.
+  You are an expert code reviewer with access to the complete codebase. You can read and analyze files directly to provide comprehensive reviews.
   
-  ## Repository Context
-  - **Repository:** {{ github_context.repository }}
-  - **Workspace:** {{ github_context.workspace }}
-  - **Event:** {{ github_context.event_name }}
+  ## Project Context
+  {{ include("README.md") }}
+  {{ include("CONTRIBUTING.md") }}
   
-  ## Changed Files
-  {% for file in files_changed %}
-  - **{{ file.filename }}** ({{ file.status }})
-  {% endfor %}
-  
-  ## Project Instructions and Documentation
-  
-  ### Global Instructions
-  {{ include("$WORKSPACE/.github/instructions.md") }}
-  {{ include("$WORKSPACE/CONTRIBUTING.md") }}
-  {{ include("$WORKSPACE/README.md") }}
-  
-  ### Directory-Specific Instructions
-  Here are instructions specific to the directories that contain changed files:
-  
-  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS_AND_THEIR_ANCESTORS/.instructions.md") }}
+  ## Directory-Specific Guidelines
   {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS_AND_THEIR_ANCESTORS/.coding-standards.md") }}
-  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS_AND_THEIR_ANCESTORS/README.md") }}
+  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS/**/README.md") }}
   
-  ### Configuration Files
-  Relevant configuration files for changed directories:
-  
+  ## Configuration Context
   {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS/**/config.yml") }}
-  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS/**/settings.json") }}
   {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS/**/.env.example") }}
   
-  ### Testing Guidelines
-  Testing instructions for the changed file areas:
+  ## Changed Files Analysis
+  {% for file in files_changed %}
+  ### {{ file.filename }} ({{ file.status }})
+  - Lines added: {{ file.additions }}
+  - Lines removed: {{ file.deletions }}
   
-  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS_AND_THEIR_ANCESTORS/test-*.md") }}
-  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS_AND_THEIR_ANCESTORS/**/testing-guide.md") }}
+  {% if file.content %}
+  **Current Content:**
+  ```
+  {{ file.content }}
+  ```
+  {% endif %}
   
-  ### Advanced Pattern Examples
+  {% if file.patch %}
+  **Changes:**
+  ```diff
+  {{ file.patch }}
+  ```
+  {% endif %}
+  {% endfor %}
   
-  #### Include all markdown files in any subdirectory of changed file directories:
-  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS/**/*.md") }}
+  ## Your Tasks
+  1. **Read and analyze** all changed files using direct file access
+  2. **Review code quality** following project standards from included guidelines
+  3. **Check for** security issues, performance problems, and best practices
+  4. **Write comprehensive review** to: `code-reviews/review-{{ github_context.sha[:8] }}.md`
+  5. **Provide status summary** to: `/tmp/review-status.md`
   
-  #### Include specific config files relative to each changed file:
-  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS_AND_THEIR_ANCESTORS/.something/**/instructions-*.md") }}
-  
-  #### Include template files from changed directories:
-  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS/**/templates/*.tmpl") }}
-  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS/**/templates/*.template") }}
-  
-  ## Your Analysis Task
-  
-  1. **Review the changed files** in context of the project documentation
-  2. **Check compliance** with directory-specific instructions
-  3. **Validate configuration** against included config files
-  4. **Assess testing** based on included testing guidelines
-  5. **Provide recommendations** based on all included documentation
-  
-  ## Output Instructions
-  
-  Write a comprehensive analysis to: `/tmp/file-inclusion-analysis.md`
-  
-  Include:
-  - Summary of changes reviewed
-  - Compliance with project guidelines
-  - Configuration issues identified
-  - Testing recommendations
-  - Overall assessment and next steps
-  
-  ## Available Variables
-  
-  You have access to these special variables in templates:
-  - `$WORKSPACE` - Repository root directory
-  - `$ALL_UNIQUE_CHANGED_FILE_DIRS` - Directories containing changed files
-  - `$ALL_UNIQUE_CHANGED_FILE_DIRS_AND_THEIR_ANCESTORS` - Above + all parent directories
-  - `$CHANGED_FILES` - List of changed file paths
-  
-  Use these to dynamically include relevant documentation and configuration files.
+  Focus on:
+  - Code quality and adherence to standards from included guidelines
+  - Security vulnerabilities and best practices
+  - Performance considerations
+  - Documentation and testing completeness
+  - Integration with existing codebase patterns
 
 output:
   format: "markdown"
-  destination: "artifact"
-  output_file: "/tmp/file-inclusion-analysis.md"
-  file_path: "analysis-{{ github_context.sha[:8] }}.md"
-  max_length: 15000
+  destination: "status_check"
+  output_file: "/tmp/review-status.md"
+  status_check_name: "Code Review with File Inclusion"
+  status_check_success_on: ["✅", "LGTM", "approved"]
+  status_check_failure_on: ["❌", "issues found", "rejected"]
+
+branch_automation:
+  enabled: true
+  branch_prefix: "review-fixes"
+  commit_message: "🤖 Automated fixes from code review"
+  create_pull_request: true
+  pr_title: "🤖 Code Review Fixes - {{ github_context.sha[:8] }}"
+  pr_body: |
+    ## Automated Code Review Fixes
+    
+    This PR contains automated fixes identified during code review using the built-in Claude CLI.
+    
+    ### Files Modified
+    {% for file in files_changed %}
+    - `{{ file.filename }}` ({{ file.status }})
+    {% endfor %}
+    
+    **Review Report**: `code-reviews/review-{{ github_context.sha[:8] }}.md`
+    **Commit**: {{ github_context.sha }}
+  pr_labels: ["automated", "code-review", "claude-ai"]
 
 enabled: true
-priority: 15 
+priority: 5 

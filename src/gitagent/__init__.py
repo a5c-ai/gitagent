@@ -6,8 +6,8 @@ with comprehensive logging, Docker support, and production-ready features.
 """
 
 __version__ = "1.0.0"
-__author__ = "AI Development Team"
-__email__ = "dev@example.com"
+__author__ = "Tal Muskal"
+__email__ = "tal@a5c.ai"
 
 from .config import Settings
 from .event_handler import EventHandler

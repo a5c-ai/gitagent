@@ -1,6 +1,6 @@
-name: 'GitHub Action Handler'
-description: 'Comprehensive GitHub Action event handler with commit history context for processing GitHub Action events'
-author: 'AI Development Team'
+name: 'gitagent'
+description: 'Intelligent GitHub Action orchestration with AI-powered event processing and multi-model support'
+author: 'Tal Muskal'
 
 branding:
   icon: 'activity'
@@ -205,13 +205,13 @@ runs:
       with:
         python-version: '3.11'
 
-    - name: Install GitHub Action Handler
+    - name: Install gitagent
       shell: bash
       run: |
-        echo "📦 Installing GitHub Action Handler..."
+        echo "📦 Installing gitagent..."
         pip install --upgrade pip
-        pip install github-action-handler
-        echo "✅ GitHub Action Handler installed successfully"
+        pip install gitagent
+        echo "✅ gitagent installed successfully"
 
     - name: Prepare environment
       shell: bash

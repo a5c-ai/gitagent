@@ -3,13 +3,13 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "github-action-handler"
+name = "gitagent"
 version = "1.0.0"
-description = "Comprehensive GitHub Action event handler with Docker support"
+description = "Intelligent GitHub Action orchestration with AI-powered event processing"
 readme = "README.md"
 license = "MIT"
 authors = [
-    { name = "AI Development Team", email = "dev@example.com" }
+    { name = "Tal Muskal", email = "tal@a5c.ai" }
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -90,16 +90,16 @@ test = [
 ]
 
 [project.scripts]
-github-action-handler = "github_action_handler.main:main"
+gitagent = "gitagent.main:main"
 
 [project.urls]
-Homepage = "https://github.com/your-org/github-action-handler"
-Repository = "https://github.com/your-org/github-action-handler"
-Documentation = "https://github.com/your-org/github-action-handler#readme"
-Issues = "https://github.com/your-org/github-action-handler/issues"
+Homepage = "https://github.com/a5c-ai/gitagent"
+Repository = "https://github.com/a5c-ai/gitagent"
+Documentation = "https://github.com/a5c-ai/gitagent#readme"
+Issues = "https://github.com/a5c-ai/gitagent/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/github_action_handler"]
+packages = ["src/gitagent"]
 
 [tool.hatch.build.targets.sdist]
 include = [

@@ -1,10 +1,10 @@
-# GitHub Action Handler
+# gitagent: GitHub Action that executes PromptOps agents from the prompts in your repo
 
-[![CI](https://github.com/tmusk/github-actions/actions/workflows/ci.yml/badge.svg)](https://github.com/tmusk/github-actions/actions/workflows/ci.yml)
-[![Docker Publish](https://github.com/tmusk/github-actions/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/tmusk/github-actions/actions/workflows/docker-publish.yml)
-[![Security Scan](https://github.com/tmusk/github-actions/actions/workflows/security-scan.yml/badge.svg)](https://github.com/tmusk/github-actions/actions/workflows/security-scan.yml)
+[![CI](https://github.com/a5c-ai/gitagent/actions/workflows/ci.yml/badge.svg)](https://github.com/a5c-ai/gitagent/actions/workflows/ci.yml)
+[![Docker Publish](https://github.com/a5c-ai/gitagent/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/a5c-ai/gitagent/actions/workflows/docker-publish.yml)
+[![Security Scan](https://github.com/a5c-ai/gitagent/actions/workflows/security-scan.yml/badge.svg)](https://github.com/a5c-ai/gitagent/actions/workflows/security-scan.yml)
 
-A comprehensive GitHub Action for handling and processing all GitHub Action events and triggers. This action provides a Docker-based event handler with extensive logging, monitoring, and notification capabilities.
+gitagent is an intelligent orchestration system for GitHub Actions that seamlessly processes events and triggers AI-powered responses. This advanced platform provides multi-model AI integration, dynamic file handling, and comprehensive GitHub automation with **pre-installed CLI tools for OpenAI Codex, Claude, and Gemini** - no setup required!
 
 ## 🚀 Features
 
@@ -26,7 +26,7 @@ A comprehensive GitHub Action for handling and processing all GitHub Action even
 ### Basic Usage
 
 ```yaml
-name: GitHub Event Handler with AI Agents
+name: gitagent Intelligent Event Orchestration
 on: [push, pull_request, issues]
 
 jobs:
@@ -36,8 +36,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Handle GitHub Events
-        uses: tmusk/github-actions@v1
+      - name: gitagent Orchestration
+        uses: a5c-ai/gitagent@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           log-level: INFO
@@ -50,7 +50,7 @@ jobs:
 
 ## 🤖 AI Agent System
 
-The GitHub Action Handler supports a powerful AI agent system that allows you to create custom AI-powered responses to GitHub events. Agents are defined using YAML configuration files organized in a hierarchical structure.
+gitagent features a powerful AI agent system that allows you to create custom AI-powered responses to GitHub events. Agents are defined using YAML configuration files organized in a hierarchical structure.
 
 ### Agent Directory Structure
 
@@ -81,6 +81,7 @@ agent:
   name: "code-reviewer"
   description: "Automated code reviewer"
   version: "1.0.0"
+  executable: "claude"  # Built-in CLI tool (no path required)
 
 configuration:
   model: "claude-3-sonnet-20241022"
@@ -207,10 +208,20 @@ priority: 10  # Lower = higher priority
 
 ### Supported Agent Types
 
-- **Codex**: OpenAI models including Codex (requires `OPENAI_API_KEY`)
-- **Gemini**: Google's Gemini AI (requires `GEMINI_API_KEY`)
-- **Claude**: Anthropic's Claude AI (requires `CLAUDE_API_KEY`)
+- **Codex**: OpenAI models including Codex (requires `OPENAI_API_KEY`) - Uses built-in `codex` CLI
+- **Gemini**: Google's Gemini AI (requires `GEMINI_API_KEY`) - Uses built-in `gemini` CLI
+- **Claude**: Anthropic's Claude AI (requires `CLAUDE_API_KEY`) - Uses built-in `claude` CLI
 - **Custom**: Custom CLI implementation
+
+### Built-in CLI Tools
+
+The Docker image includes pre-installed CLI tools for all supported AI providers:
+
+- **OpenAI Codex CLI** (`codex`): Official OpenAI CLI with advanced coding capabilities and sandbox execution
+- **Claude CLI** (`claude`): Community-maintained CLI for Anthropic's Claude models
+- **Gemini CLI** (`gemini`): Community-maintained CLI for Google's Gemini models
+
+These tools are available system-wide and can be used directly in agent configurations without specifying executable paths.
 
 ### Template Variables
 
@@ -477,28 +488,54 @@ When branch automation is enabled:
 5. **Pull Request**: Optionally creates a PR with templated title and description
 6. **Output Variables**: Returns branch name, PR number, and PR URL
 
+### CLI Tool Configuration
+
+With the built-in CLI tools, you can simplify your agent configurations:
+
+```yaml
+# Simplified OpenAI Codex agent
+agent:
+  type: "codex"
+  name: "code-assistant"
+  executable: "codex"  # No path required - built into container
+
+# Simplified Claude agent  
+agent:
+  type: "claude"
+  name: "claude-reviewer"
+  executable: "claude"  # No path required - built into container
+
+# Simplified Gemini agent
+agent:
+  type: "gemini" 
+  name: "gemini-analyzer"
+  executable: "gemini"  # No path required - built into container
+```
+
+The built-in CLI tools support all standard command-line arguments and can be configured with appropriate API keys through environment variables.
+
 ### CLI Management
 
-The system includes comprehensive CLI commands for agent management:
+gitagent includes comprehensive CLI commands for agent management:
 
 ```bash
 # List all discovered agents
-python -m github_action_handler agents list
+python -m gitagent agents list
 
 # Test a specific agent configuration
-python -m github_action_handler agents test .github/action-handlers/push/claude-reviewer.yml
+python -m gitagent agents test .github/action-handlers/push/claude-reviewer.yml
 
 # Validate all agent configurations
-python -m github_action_handler agents validate
+python -m gitagent agents validate
 
 # Show agent statistics
-python -m github_action_handler agents stats
+python -m gitagent agents stats
 ```
 
 ### Advanced Configuration
 
 ```yaml
-name: Advanced Event Handler with AI Agents
+name: Advanced gitagent Orchestration
 on: [workflow_run, deployment, security_advisory, push, pull_request]
 
 jobs:
@@ -508,8 +545,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Advanced Event Handler
-        uses: tmusk/github-actions@v1
+      - name: Advanced gitagent Orchestration
+        uses: a5c-ai/gitagent@v1
         with:
           # Authentication
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -564,10 +601,12 @@ jobs:
 |-------|-------------|---------|----------|
 | `agents-enabled` | Enable AI agent processing | `true` | No |
 | `agents-directory` | Directory containing agent configurations | `.github/action-handlers` | No |
-| `claude-api-key` | Anthropic Claude API key | `''` | No |
-| `gemini-api-key` | Google Gemini API key | `''` | No |
-| `openai-api-key` | OpenAI API key (used for Codex agents) | `''` | No |
+| `claude-api-key` | Anthropic Claude API key (for built-in `claude` CLI) | `''` | No |
+| `gemini-api-key` | Google Gemini API key (for built-in `gemini` CLI) | `''` | No |
+| `openai-api-key` | OpenAI API key (for built-in `codex` CLI) | `''` | No |
 | `anthropic-api-key` | Alternative Anthropic API key | `''` | No |
+
+**Note**: All CLI tools are pre-installed in the Docker image. Simply provide the appropriate API key and reference the tool name (e.g., `codex`, `claude`, `gemini`) in your agent configurations.
 
 ### Feature Toggles
 
@@ -688,8 +727,8 @@ Once running, the handler exposes several endpoints:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/tmusk/github-actions.git
-   cd github-actions
+   git clone https://github.com/a5c-ai/gitagent.git
+   cd gitagent
    ```
 
 2. **Set up development environment**
@@ -716,7 +755,7 @@ Once running, the handler exposes several endpoints:
 
 1. **Build the image**
    ```bash
-   docker build -t github-action-handler .
+   docker build -t gitagent .
    ```
 
 2. **Run locally**
@@ -724,7 +763,7 @@ Once running, the handler exposes several endpoints:
    docker run -p 8000:8000 \
      -e GITHUB_TOKEN=your_token \
      -e LOG_LEVEL=DEBUG \
-     github-action-handler
+     gitagent
    ```
 
 3. **Test the endpoints**
@@ -743,7 +782,7 @@ pytest tests/unit/
 pytest tests/integration/
 
 # With coverage
-pytest --cov=src/github_action_handler
+pytest --cov=src/gitagent
 
 # Specific test file
 pytest tests/test_event_handler.py -v
@@ -817,7 +856,7 @@ When metrics are enabled, the handler exposes Prometheus metrics:
 1. **Container won't start**
    ```bash
    # Check logs
-   docker logs github-action-handler-<run-id>
+   docker logs gitagent-<run-id>
    
    # Verify configuration
    curl http://localhost:8000/config
@@ -842,7 +881,7 @@ When metrics are enabled, the handler exposes Prometheus metrics:
 Enable debug logging for detailed troubleshooting:
 
 ```yaml
-- uses: tmusk/github-actions@v1
+- uses: a5c-ai/gitagent@v1
   with:
     log-level: DEBUG
     log-format: console
@@ -880,11 +919,53 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [structlog](https://www.structlog.org/) for structured logging
 - [GitHub](https://github.com/) for the comprehensive webhook system
 
+## 🚀 Quick Start with Built-in CLI Tools
+
+gitagent includes pre-installed CLI tools for all major AI providers, making it incredibly easy to get started:
+
+### Simple Agent Configuration
+
+```yaml
+# OpenAI Codex Agent - Just specify the executable name
+agent:
+  type: "codex"
+  name: "my-codex-assistant"
+  executable: "codex"  # No path required!
+
+# Claude Agent - Built-in and ready to use  
+agent:
+  type: "claude"
+  name: "my-claude-reviewer"
+  executable: "claude"  # No path required!
+
+# Gemini Agent - Pre-installed for convenience
+agent:
+  type: "gemini" 
+  name: "my-gemini-analyzer"
+  executable: "gemini"  # No path required!
+```
+
+### Benefits of Built-in CLI Tools
+
+✅ **Zero Configuration** - No need to install or configure CLI tools manually  
+✅ **Consistent Versions** - All tools are tested and compatible  
+✅ **Simplified Configs** - Just specify the tool name, not the full path  
+✅ **Ready to Use** - Docker image includes everything you need  
+✅ **Security** - Tools are installed in a controlled, secure environment  
+
+### Getting Started
+
+1. **Set API Keys** - Add your API keys as environment variables
+2. **Create Agents** - Use the simple configuration format above
+3. **Deploy** - Run the action and your agents will work immediately
+
+No complex setup, no path configuration, no CLI installation - just pure AI-powered automation!
+
 ## 📞 Support
 
-- 📖 [Documentation](https://github.com/tmusk/github-actions/wiki)
-- 🐛 [Issue Tracker](https://github.com/tmusk/github-actions/issues)
-- 💬 [Discussions](https://github.com/tmusk/github-actions/discussions)
+- 📖 [Documentation](https://github.com/a5c-ai/gitagent/wiki)
+- 🐛 [Issue Tracker](https://github.com/a5c-ai/gitagent/issues)
+- 💬 [Discussions](https://github.com/a5c-ai/gitagent/discussions)
 - 📧 [Email Support](mailto:support@example.com)
 
 ---

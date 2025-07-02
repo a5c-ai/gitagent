@@ -217,9 +217,9 @@ class GitHubActionHandlerDemo:
         """Process an event directly using the handler."""
         try:
             # Import the handler modules
-            from github_action_handler.config import Settings
-            from github_action_handler.event_handler import GitHubActionEventProcessor
-            from github_action_handler.models import GitHubEvent
+            from gitagent.config import Settings
+            from gitagent.event_handler import GitHubActionEventProcessor
+            from gitagent.models import GitHubEvent
             
             # Initialize settings and processor
             settings = Settings()
@@ -277,8 +277,8 @@ class GitHubActionHandlerDemo:
     async def get_supported_events(self) -> List[Dict[str, Any]]:
         """Get list of supported events."""
         try:
-            from github_action_handler.event_handler import GitHubActionEventProcessor
-            from github_action_handler.config import Settings
+            from gitagent.event_handler import GitHubActionEventProcessor
+            from gitagent.config import Settings
             
             settings = Settings()
             processor = GitHubActionEventProcessor(settings)
@@ -289,8 +289,8 @@ class GitHubActionHandlerDemo:
     async def get_statistics(self) -> Dict[str, Any]:
         """Get processing statistics."""
         try:
-            from github_action_handler.event_handler import GitHubActionEventProcessor
-            from github_action_handler.config import Settings
+            from gitagent.event_handler import GitHubActionEventProcessor
+            from gitagent.config import Settings
             
             settings = Settings()
             processor = GitHubActionEventProcessor(settings)
