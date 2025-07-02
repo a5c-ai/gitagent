@@ -35,6 +35,9 @@ dependencies = [
     # HTTP client
     "httpx>=0.25.0",
     
+    # GitHub API client
+    "PyGithub>=2.1.0",
+    
     # Logging and monitoring
     "structlog>=23.2.0",
     "colorama>=0.4.6",
@@ -76,6 +79,7 @@ dev = [
     "flake8>=6.1.0",
     "mypy>=1.7.0",
     "pre-commit>=3.5.0",
+    "rich>=13.0.0",  # For demo script
 ]
 test = [
     "pytest>=7.4.0",
