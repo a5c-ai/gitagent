@@ -69,7 +69,7 @@ jobs:
           type=raw,value=latest,enable={{is_default_branch}}
           type=sha,prefix={{branch}}-
         labels: |
-          org.opencontainers.image.title=GitHub Action Handler
+          org.opencontainers.image.title=gitagent
           org.opencontainers.image.description=Comprehensive GitHub Action event handler with Docker support
           org.opencontainers.image.vendor=Your Organization
           org.opencontainers.image.licenses=MIT
@@ -150,9 +150,9 @@ jobs:
           -e WEBHOOK_SIGNATURE_REQUIRED=false \
           ${{ steps.image.outputs.name }} \
           python -c "
-        import github_action_handler
-        print('✅ GitHub Action Handler imported successfully')
-        print(f'Version: {github_action_handler.__version__}')
+        import gitagent
+        print('✅ gitagent imported successfully')
+        print(f'Version: {gitagent.__version__}')
         "
 
     - name: Test container startup

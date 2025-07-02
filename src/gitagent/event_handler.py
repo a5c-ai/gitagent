@@ -1,5 +1,5 @@
 """
-Core event processing logic for GitHub Action Handler.
+Core event processing logic for gitagent.
 
 This module provides the main event processing functionality with commit history context
 and pluggable event handlers for different GitHub event types.

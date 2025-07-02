@@ -1,5 +1,5 @@
 """
-AI Agent Management for GitHub Action Handler.
+AI Agent Management for gitagent.
 
 This module handles discovery, configuration, and execution of AI agents
 based on YAML configuration files in the target repository.

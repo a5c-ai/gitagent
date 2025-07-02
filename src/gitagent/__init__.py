@@ -1,5 +1,5 @@
 """
-GitHub Action Handler - Comprehensive event processing for GitHub Actions.
+gitagent - Comprehensive event processing for GitHub Actions.
 
 This package provides a complete solution for handling GitHub Action events
 with comprehensive logging, Docker support, and production-ready features.

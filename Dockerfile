@@ -75,7 +75,7 @@ RUN apt-get update && apt-get install -y \
 
 # Create non-root user for security
 RUN groupadd -r github-handler && \
-    useradd -r -g github-handler -d /app -s /bin/bash -c "GitHub Action Handler" github-handler
+    useradd -r -g github-handler -d /app -s /bin/bash -c "gitagent" github-handler
 
 # Set working directory
 WORKDIR /app

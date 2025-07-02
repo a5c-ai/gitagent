@@ -1,5 +1,5 @@
 """
-Structured logging configuration for GitHub Action Handler.
+Structured logging configuration for gitagent.
 
 This module sets up comprehensive structured logging using structlog with
 JSON output, performance metrics, security logging, and flexible configuration.
@@ -379,7 +379,7 @@ def log_application_startup(
 ) -> None:
     """Log application startup."""
     logger.info(
-        "GitHub Action Handler started",
+        "gitagent started",
         host=host,
         port=port,
         debug_mode=debug,
@@ -390,6 +390,6 @@ def log_application_startup(
 def log_application_shutdown(logger: structlog.BoundLogger) -> None:
     """Log application shutdown."""
     logger.info(
-        "GitHub Action Handler shutting down",
+        "gitagent shutting down",
         stage="shutdown"
     ) 

@@ -1,7 +1,7 @@
 """
-Main entry point for GitHub Action Handler.
+Main entry point for gitagent.
 
-This module provides the main CLI interface for the GitHub Action Handler,
+This module provides the main CLI interface for the gitagent,
 supporting direct event processing and configuration management.
 """
 
@@ -25,24 +25,24 @@ from .agent_manager import agent_manager
 def setup_argument_parser() -> argparse.ArgumentParser:
     """Set up command line argument parser."""
     parser = argparse.ArgumentParser(
-        description="GitHub Action Handler - Process GitHub Action events with commit history context",
+        description="gitagent - Process GitHub Action events with commit history context",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Process current GitHub Action event
-  python -m github_action_handler process
+  python -m gitagent process
 
   # Process a specific event file
-  python -m github_action_handler process --event-file event.json
+  python -m gitagent process --event-file event.json
 
   # List supported events
-  python -m github_action_handler list-events
+  python -m gitagent list-events
 
   # Show configuration
-  python -m github_action_handler config
+  python -m gitagent config
 
   # Validate configuration
-  python -m github_action_handler validate-config
+  python -m gitagent validate-config
         """
     )
     
@@ -390,7 +390,7 @@ def show_configuration(args: argparse.Namespace, settings: Settings) -> int:
             print(json.dumps(config_data, indent=2))
         else:
             # Table format
-            print("GitHub Action Handler Configuration")
+            print("gitagent Configuration")
             print("=" * 50)
             
             for key, value in config_data.items():

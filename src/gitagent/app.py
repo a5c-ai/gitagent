@@ -1,5 +1,5 @@
 """
-FastAPI application for GitHub Action Handler.
+FastAPI application for gitagent.
 
 This application provides REST endpoints for processing GitHub Action events
 and retrieving handler information, without webhook functionality.
@@ -41,7 +41,7 @@ def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     
     app = FastAPI(
-        title="GitHub Action Handler",
+        title="gitagent",
         description="Comprehensive GitHub Action event handler with commit history context",
         version="1.0.0",
         docs_url="/docs" if settings.development_mode else None,
@@ -267,7 +267,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 async def startup_event():
     """Application startup event."""
     logger.info(
-        "GitHub Action Handler starting up",
+        "gitagent starting up",
         version="1.0.0",
         log_level=settings.log_level,
         max_concurrent_events=settings.max_concurrent_events
@@ -277,7 +277,7 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Application shutdown event."""
-    logger.info("GitHub Action Handler shutting down")
+    logger.info("gitagent shutting down")
 
 
 if __name__ == "__main__":

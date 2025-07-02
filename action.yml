@@ -284,9 +284,9 @@ runs:
         import json
         import asyncio
         from datetime import datetime, timezone
-        from github_action_handler.config import Settings
-        from github_action_handler.event_handler import GitHubActionEventProcessor
-        from github_action_handler.models import GitHubEvent
+        from gitagent.config import Settings
+        from gitagent.event_handler import GitHubActionEventProcessor
+        from gitagent.models import GitHubEvent
         
         async def main():
             try:
@@ -379,7 +379,7 @@ runs:
     - name: Display processing summary
       shell: bash
       run: |
-        echo "📊 GitHub Action Handler Processing Summary"
+        echo "📊 gitagent Processing Summary"
         echo "==========================================="
         echo "🎯 Event: ${{ github.event_name }}"
         echo "📋 Repository: ${{ github.repository }}"
@@ -398,4 +398,4 @@ runs:
         echo "  - Event Storage: ${{ inputs.event-storage-enabled }}"
         echo "  - Git Commit History: ${{ inputs.git-commit-history-count }} commits"
         echo ""
-        echo "✅ GitHub Action Handler completed successfully!" 
+        echo "✅ gitagent completed successfully!" 

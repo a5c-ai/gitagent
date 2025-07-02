@@ -85,7 +85,7 @@ jobs:
       run: |
         pytest tests/ \
           --verbose \
-          --cov=src/github_action_handler \
+          --cov=src/gitagent \
           --cov-report=xml \
           --cov-report=term-missing \
           --cov-report=html \
@@ -131,15 +131,15 @@ jobs:
         
     - name: Validate default configuration
       run: |
-        python -m github_action_handler.main --config-check
+        python -m gitagent.main --config-check
         
     - name: List supported events
       run: |
-        python -m github_action_handler.main --list-events
+        python -m gitagent.main --list-events
         
     - name: Test help output
       run: |
-        python -m github_action_handler.main --help
+        python -m gitagent.main --help
 
   docker-build:
     name: Docker Build Test

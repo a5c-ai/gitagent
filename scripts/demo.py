@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-GitHub Action Handler Demo Script
+gitagent Demo Script
 
-This script demonstrates the capabilities of the GitHub Action Handler
+This script demonstrates the capabilities of the gitagent
 by simulating various GitHub events and testing the handler's functionality.
 """
 
@@ -36,7 +36,7 @@ SAMPLE_EVENTS = {
             "owner": {"login": "test-user", "id": 12345},
             "private": False,
             "html_url": "https://github.com/test-user/test-repo",
-            "description": "A test repository for GitHub Action Handler demo",
+            "description": "A test repository for gitagent demo",
             "fork": False,
             "created_at": "2024-01-01T00:00:00Z",
             "updated_at": "2024-01-15T12:00:00Z",
@@ -80,7 +80,7 @@ SAMPLE_EVENTS = {
             "number": 42,
             "state": "open",
             "title": "Add comprehensive event handling",
-            "body": "This PR adds comprehensive event handling capabilities to the GitHub Action Handler.",
+            "body": "This PR adds comprehensive event handling capabilities to the gitagent.",
             "created_at": "2024-01-15T12:00:00Z",
             "updated_at": "2024-01-15T12:00:00Z",
             "closed_at": None,
@@ -202,7 +202,7 @@ SAMPLE_EVENTS = {
 
 
 class GitHubActionHandlerDemo:
-    """Demonstration client for GitHub Action Handler."""
+    """Demonstration client for gitagent."""
     
     def __init__(self):
         pass
@@ -455,7 +455,7 @@ def display_load_test_results(results: Dict[str, Any]):
 @click.group()
 @click.pass_context
 def cli(ctx):
-    """GitHub Action Handler Demo CLI"""
+    """gitagent Demo CLI"""
     ctx.ensure_object(dict)
 
 
@@ -526,7 +526,7 @@ async def load_test(ctx, count, event_types):
 async def demo(ctx):
     """Run a comprehensive demonstration"""
     async with GitHubActionHandlerDemo() as demo:
-        console.print("[bold green]🚀 GitHub Action Handler Comprehensive Demo[/bold green]")
+        console.print("[bold green]🚀 gitagent Comprehensive Demo[/bold green]")
         console.print("=" * 60)
         
         # 1. Supported Events
@@ -564,7 +564,7 @@ async def demo(ctx):
         display_load_test_results(load_results)
         
         console.print("\n[bold green]🎉 Demo completed successfully![/bold green]")
-        console.print("The GitHub Action Handler is working correctly and ready to process GitHub Action events.")
+        console.print("The gitagent is working correctly and ready to process GitHub Action events.")
 
 
 if __name__ == "__main__":

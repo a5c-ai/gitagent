@@ -1,5 +1,5 @@
 """
-Configuration management for GitHub Action Handler using Pydantic Settings.
+Configuration management for gitagent using Pydantic Settings.
 """
 
 import os
