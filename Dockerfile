@@ -2,7 +2,7 @@
 # This Dockerfile creates an optimized production image with security best practices
 
 # Build stage
-FROM python:3.11-bookworm AS builder
+FROM ubuntu:noble AS builder
 
 # Set build arguments
 ARG BUILDPLATFORM
@@ -14,6 +14,9 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     git \
+    python3 \
+    python3-venv \
+    python3-pip \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -26,7 +29,7 @@ COPY pyproject.toml README.md ./
 COPY src/ ./src/
 
 # Install Python dependencies to a virtual environment
-RUN python -m venv /opt/venv
+RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir .
@@ -45,7 +48,7 @@ RUN mkdir -p /opt/cli-tools/bin && \
     ln -s /opt/venv/bin/gemini-cli /opt/cli-tools/bin/gemini
 
 # Production stage
-FROM python:3.11-bookworm AS production
+FROM ubuntu:noble AS production
 
 # Set metadata labels
 LABEL maintainer="Tal Muskal <tal@a5c.ai>"
@@ -63,6 +66,8 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     tini \
     curl \
+    python3 \
+    python3-venv \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && apt-get upgrade -y \
@@ -126,7 +131,7 @@ EXPOSE 8000
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # Default command
-CMD ["python", "-m", "gitagent.main"]
+CMD ["python3", "-m", "gitagent.main"]
 
 # Development stage (optional)
 FROM production AS development
@@ -157,7 +162,7 @@ RUN pip install --no-cache-dir \
 USER gitagent
 
 # Override default command for development
-CMD ["python", "-m", "gitagent.main", "--debug", "--reload"]
+CMD ["python3", "-m", "gitagent.main", "--debug", "--reload"]
 
 # Testing stage
 FROM builder AS testing
@@ -169,7 +174,7 @@ RUN pip install --no-cache-dir .[test]
 COPY tests/ ./tests/
 
 # Run tests
-RUN python -m pytest tests/ -v --cov=src/gitagent --cov-report=xml --cov-report=term-missing
+RUN python3 -m pytest tests/ -v --cov=src/gitagent --cov-report=xml --cov-report=term-missing
 
 # Final production stage
 FROM production AS final
@@ -189,10 +194,10 @@ LABEL org.opencontainers.image.revision=${VCS_REF}
 USER gitagent
 
 # Verify dependencies and installation
-RUN python -c "import gitagent; print('gitagent and dependencies installed successfully')" && \
+RUN python3 -c "import gitagent; print('gitagent and dependencies installed successfully')" && \
     codex --version && echo "OpenAI Codex CLI installed successfully" && \
     claude --help && echo "Claude Code installed successfully" && \
     gemini --help && echo "Gemini CLI installed successfully"
 
 # Default command
-CMD ["python", "-m", "gitagent.main"] 
+CMD ["python3", "-m", "gitagent.main"] 
