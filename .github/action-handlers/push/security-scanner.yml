@@ -134,8 +134,8 @@ output:
 
 # Also post status check
 mcp_servers:
-  - name: "security-context"
-    url: "security://scanner"
+  - name: "mcp-server"
+    url: "https://remote.mcp.dev/sse"
     enabled: true
 
 enabled: true

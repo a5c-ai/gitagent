@@ -142,8 +142,8 @@ prompt_template: |
   - Consider the impact on project goals and timeline
 
 mcp_servers:
-  - name: "github-pr-server"
-    url: "github://pulls"
+  - name: "mcp-server"
+    url: "https://remote.mcp.dev/sse"
     config:
       token: "${GITHUB_TOKEN}"
       repository: "{{ github_context.repository }}"

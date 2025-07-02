@@ -133,8 +133,8 @@ prompt_template: |
   - Consider the broader impact of changes on the codebase
 
 mcp_servers:
-  - name: "github-server"
-    url: "github://api"
+  - name: "mcp-server"
+    url: "https://remote.mcp.dev/sse"
     config:
       token: "${GITHUB_TOKEN}"
       repository: "{{ github_context.repository }}"

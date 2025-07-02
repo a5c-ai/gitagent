@@ -131,8 +131,8 @@ prompt_template: |
   - Provide complete, production-ready implementations
 
 mcp_servers:
-  - name: "github-server"
-    url: "github://api"
+  - name: "mcp-server"
+    url: "https://remote.mcp.dev/sse"
     config:
       token: "${GITHUB_TOKEN}"
     enabled: true

@@ -12,10 +12,6 @@ gitagent is an intelligent orchestration system for GitHub Actions that seamless
 - **Dynamic Configuration**: YAML-based agent definitions with hierarchical organization by event type
 - **Template System**: Jinja2 template support for dynamic prompts with event context
 - **Commit History Context**: Automatically includes recent commit history in agent prompts
-- **MCP Server Support**: Model Context Protocol integration for enhanced agent capabilities
-- **Flexible Output**: Multiple output destinations (console, files, artifacts, comments)
-- **Production Ready**: Comprehensive logging, monitoring, health checks, and error handling
-- **Security First**: Secure agent execution with environment variable protection
 - **Highly Configurable**: Extensive configuration options for all aspects of event processing
 - **CLI Management**: Complete CLI for agent discovery, testing, and validation
 
@@ -145,8 +141,8 @@ prompt_template: |
   - Focus on providing constructive, actionable feedback
 
 mcp_servers:
-  - name: "github-server"
-    url: "github://api"
+  - name: "mcp-server"
+    url: "https://remote.mcp.dev/sse"
     config:
       token: "${GITHUB_TOKEN}"
     enabled: true
