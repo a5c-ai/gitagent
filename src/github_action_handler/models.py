@@ -103,6 +103,8 @@ class OutputDestination(str, Enum):
     ISSUE = "issue"
     CONSOLE = "console"
     ARTIFACT = "artifact"
+    STATUS_CHECK = "status_check"
+    CREATE_ISSUE = "create_issue"
 
 
 class AgentCliConfiguration(BaseModel):
@@ -140,6 +142,12 @@ class AgentTriggerCondition(BaseModel):
     event_actions: Optional[List[str]] = Field(None, description="Specific event actions")
     files_changed_min: Optional[int] = Field(None, description="Minimum files changed")
     files_changed_max: Optional[int] = Field(None, description="Maximum files changed")
+    
+    # File-specific change monitoring
+    files_changed: Optional[List[str]] = Field(None, description="Specific file patterns that must have changed (glob)")
+    include_file_content: bool = Field(default=False, description="Include file content in template variables")
+    include_file_diff: bool = Field(default=False, description="Include file diff in template variables")
+    file_diff_context: int = Field(default=3, description="Number of context lines for file diffs")
 
 
 class AgentOutputConfig(BaseModel):
@@ -150,6 +158,60 @@ class AgentOutputConfig(BaseModel):
     file_path: Optional[str] = Field(None, description="File path for file destination")
     max_length: Optional[int] = Field(None, description="Maximum output length")
     template: Optional[str] = Field(None, description="Output template")
+    
+    # File-based output configuration
+    output_file: Optional[str] = Field(None, description="Path to file where agent writes its output")
+    comment_output_file: Optional[str] = Field(None, description="Path to file where agent writes comment content")
+    
+    # Status check configuration
+    status_check_name: Optional[str] = Field(None, description="Name for GitHub status check")
+    status_check_success_on: List[str] = Field(default_factory=list, description="Keywords that indicate success")
+    status_check_failure_on: List[str] = Field(default_factory=list, description="Keywords that indicate failure")
+    
+    # Comment configuration  
+    comment_on_success: bool = Field(default=True, description="Post comment on successful execution")
+    comment_on_failure: bool = Field(default=True, description="Post comment on failed execution")
+    comment_template: Optional[str] = Field(None, description="Template for comment content")
+    
+    # Issue creation configuration
+    issue_title_template: Optional[str] = Field(None, description="Template for created issue title")
+    issue_body_template: Optional[str] = Field(None, description="Template for created issue body")
+    issue_labels: List[str] = Field(default_factory=list, description="Labels to add to created issues")
+    issue_assignees: List[str] = Field(default_factory=list, description="Assignees for created issues")
+    issue_milestone: Optional[str] = Field(None, description="Milestone for created issues")
+
+
+class AgentBranchAutomation(BaseModel):
+    """Configuration for automated branch creation and PR workflows."""
+    
+    enabled: bool = Field(default=False, description="Enable branch automation")
+    branch_prefix: str = Field(default="agent-fix", description="Prefix for created branches")
+    commit_message: Optional[str] = Field(None, description="Template for commit message (Jinja2)")
+    create_pull_request: bool = Field(default=False, description="Create pull request after pushing branch")
+    pr_title: Optional[str] = Field(None, description="Template for PR title (Jinja2)")
+    pr_body: Optional[str] = Field(None, description="Template for PR body (Jinja2)")
+    pr_labels: List[str] = Field(default_factory=list, description="Labels to add to created PR")
+    pr_assignees: List[str] = Field(default_factory=list, description="Assignees for created PR")
+    pr_reviewers: List[str] = Field(default_factory=list, description="Reviewers for created PR")
+    target_branch: Optional[str] = Field(None, description="Target branch for PR (defaults to repo default branch)")
+    delete_branch_on_merge: bool = Field(default=True, description="Delete branch when PR is merged")
+
+
+class FileChange(BaseModel):
+    """Model for file change information."""
+    
+    filename: str = Field(..., description="File path")
+    status: str = Field(..., description="Change status (added, removed, modified)")
+    additions: int = Field(default=0, description="Number of lines added")
+    deletions: int = Field(default=0, description="Number of lines deleted")
+    changes: int = Field(default=0, description="Total number of changes")
+    blob_url: Optional[str] = Field(None, description="URL to blob")
+    raw_url: Optional[str] = Field(None, description="URL to raw file")
+    contents_url: Optional[str] = Field(None, description="URL to file contents")
+    patch: Optional[str] = Field(None, description="Unified diff patch")
+    content: Optional[str] = Field(None, description="File content (if requested)")
+    content_before: Optional[str] = Field(None, description="File content before changes")
+    content_after: Optional[str] = Field(None, description="File content after changes")
 
 
 class AgentDefinition(BaseModel):
@@ -161,6 +223,7 @@ class AgentDefinition(BaseModel):
     prompt_template: str = Field(..., description="Jinja2 template for the agent prompt")
     mcp_servers: List[McpServerConfig] = Field(default_factory=list, description="MCP servers for this agent")
     output: AgentOutputConfig = Field(default_factory=AgentOutputConfig, description="Output configuration")
+    branch_automation: Optional[AgentBranchAutomation] = Field(None, description="Branch automation configuration")
     enabled: bool = Field(default=True, description="Whether the agent is enabled")
     priority: int = Field(default=100, description="Execution priority (lower = higher priority)")
 
@@ -347,6 +410,18 @@ class AgentExecutionResult(BaseModel):
     execution_time: float = Field(..., description="Execution time in seconds")
     output_destination: OutputDestination = Field(..., description="Where output was sent")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    
+    # Branch automation results
+    branch_created: Optional[str] = Field(None, description="Name of branch created (if any)")
+    pr_created: Optional[int] = Field(None, description="PR number created (if any)")
+    pr_url: Optional[str] = Field(None, description="URL of created PR (if any)")
+    files_changed: List[FileChange] = Field(default_factory=list, description="Files that triggered this agent")
+    
+    # GitHub integration results
+    status_check_posted: Optional[str] = Field(None, description="Status check state posted (success/failure/pending)")
+    comment_posted: Optional[str] = Field(None, description="URL of comment posted (if any)")
+    issue_created: Optional[int] = Field(None, description="Issue number created (if any)")
+    issue_url: Optional[str] = Field(None, description="URL of created issue (if any)")
 
 
 class GitHubEvent(BaseModel):

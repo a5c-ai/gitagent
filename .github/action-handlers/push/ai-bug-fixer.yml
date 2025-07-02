@@ -1,0 +1,204 @@
+agent:
+  type: "claude"
+  name: "ai-bug-fixer"
+  description: "AI developer that reads bug reports and implements fixes"
+  version: "2.0.0"
+
+configuration:
+  model: "claude-3-sonnet-20241022"
+  max_tokens: 8000
+  temperature: 0.1
+
+triggers:
+  branches: ["main", "develop"]
+  paths: ["*.py", "*.js", "*.ts", "*.go", "*.rs", "*.java"]
+  event_actions: ["opened", "synchronize"]
+  
+  # Monitor specific bug report files
+  files_changed: ["bug-reports/*.md", "issues/*.md", "BUGS.md"]
+  include_file_content: true
+  include_file_diff: true
+  file_diff_context: 5
+
+prompt_template: |
+  You are an expert AI software developer with direct file system access. You can read, analyze, and modify files in the repository to implement bug fixes.
+  
+  ## Repository Context
+  - **Repository:** {{ github_context.repository }}
+  - **Branch:** {{ github_context.ref }}
+  - **Event:** {{ github_context.event_name }}
+  - **Commit:** {{ github_context.sha }}
+  - **Workspace:** {{ github_context.workspace }}
+  
+  ## Bug Report Files to Process
+  {% for file in files_changed %}
+  {% if file.filename.endswith('.md') %}
+  - **{{ file.filename }}** ({{ file.status }})
+  {% endif %}
+  {% endfor %}
+  
+  ## Your File-Based Workflow
+  
+  1. **Read Bug Reports Directly:**
+     {% for file in files_changed %}
+     {% if file.filename.endswith('.md') %}
+     - Read the complete bug report from: `{{ file.filename }}`
+     {% endif %}
+     {% endfor %}
+  
+  2. **Analyze the Codebase:**
+     - Use your file access to explore the repository structure
+     - Read relevant source files to understand the current implementation
+     - Identify the root cause of each reported bug
+  
+  3. **Implement Complete Fixes:**
+     - Modify the necessary source files directly
+     - Write clean, tested code that follows project conventions
+     - Add or update tests as needed
+     - Ensure your fixes don't introduce new issues
+  
+  4. **Create Status Report:**
+     - Write a comprehensive status report to: `/tmp/ai-bug-fixer-status.md`
+     - Include analysis, implementation details, and testing notes
+     - Use the format specified below
+  
+  5. **Write Status Check Content:**
+     - Write concise status check content to: `/tmp/ai-bug-fixer-status-check.md`
+     - This will be used for GitHub status checks
+  
+  ## Status Report Format (write to `/tmp/ai-bug-fixer-status.md`)
+  
+  ```markdown
+  # 🤖 AI Bug Fixer Status Report
+  
+  **Repository:** {{ github_context.repository }}
+  **Commit:** {{ github_context.sha }}
+  **Branch:** {{ github_context.ref }}
+  **Date:** [Current timestamp]
+  
+  ## Bug Reports Processed
+  
+  [For each bug report file you read]
+  
+  ### Bug: [Bug title/summary]
+  **File:** [path to .md file]
+  **Status:** [FIXED/NEEDS_REVIEW/FAILED]
+  
+  #### 🔍 Analysis
+  [Your analysis of the problem]
+  
+  #### 🛠 Implementation
+  [What you implemented - files modified, approach taken]
+  
+  #### 🧪 Testing
+  [Tests added/modified, how to verify the fix]
+  
+  ---
+  
+  ## Overall Status
+  - **Bugs Fixed:** [count]
+  - **Bugs Requiring Review:** [count]
+  - **Files Modified:** [list of files]
+  - **Tests Added/Updated:** [list of test files]
+  
+  ## Summary
+  [Overall summary - end with one of:]
+  - ✅ ALL BUGS FIXED
+  - ⚠️ REQUIRES REVIEW
+  - 🚨 CRITICAL ISSUES FOUND
+  ```
+  
+  ## Status Check Format (write to `/tmp/ai-bug-fixer-status-check.md`)
+  
+  Write a concise status for GitHub status checks:
+  - Start with "🔍 ANALYSIS:" and "🛠 IMPLEMENTATION:" sections
+  - End with "✅ ALL BUGS FIXED", "⚠️ REQUIRES REVIEW", or "🚨 CRITICAL:"
+  - Keep under 500 characters for status check description
+  
+  ## Important Notes
+  - You have full read/write access to the repository files
+  - Make actual code changes to fix the bugs
+  - Write comprehensive status reports
+  - Both status files are required for proper workflow completion
+
+output:
+  format: "markdown"
+  destination: "status_check"
+  output_file: "/tmp/ai-bug-fixer-status-check.md"
+  max_length: 10000
+  
+  # Status check configuration - determines success/failure  
+  status_check_name: "AI Bug Fixer"
+  status_check_success_on: ["✅ ALL BUGS FIXED", "🛠 IMPLEMENTATION:", "✅"]
+  status_check_failure_on: ["🚨 CRITICAL:", "❌", "ERROR:", "FAILED", "⚠️ REQUIRES REVIEW"]
+  
+  # Also post detailed comment on PR - reads from status report file
+  comment_on_success: true
+  comment_on_failure: true
+  comment_output_file: "/tmp/ai-bug-fixer-status.md"
+  comment_template: |
+    ## 🤖 AI Bug Fixer Results
+    
+    **Files Processed:** {{ files_changed | length }}
+    **Commit:** `{{ github_context.sha[:8] }}`
+    
+    ### Detailed Status Report
+    {{ comment_output_content }}
+    
+    ---
+    
+    ### Files Analyzed
+    {% for file in files_changed %}
+    - 📄 `{{ file.filename }}` {% if file.status == 'added' %}(new file){% elif file.status == 'modified' %}(modified){% elif file.status == 'removed' %}(deleted){% endif %}
+    {% endfor %}
+
+# Branch automation for automatic fixes
+branch_automation:
+  enabled: true
+  branch_prefix: "ai-bugfix"
+  commit_message: "🤖 AI Bug Fixes: {{ ', '.join([f.filename.split('/')[-1] for f in files_changed if f.filename.endswith('.md')]) }}"
+  
+  create_pull_request: true
+  pr_title: "🤖 Automated Bug Fixes from AI Developer"
+  pr_body: |
+    ## 🤖 AI-Generated Bug Fixes
+    
+    This PR contains automated bug fixes generated by the AI Bug Fixer agent.
+    
+    ### Bug Reports Processed
+    {% for file in files_changed %}
+    {% if file.filename.endswith('.md') %}
+    - 📋 `{{ file.filename }}`
+    {% endif %}
+    {% endfor %}
+    
+    ### Implementation Summary
+    The AI developer analyzed the bug reports and implemented comprehensive fixes:
+    
+    {{ output[:500] }}...
+    
+    {% if status_check_posted == 'success' %}
+    ✅ **Status:** All bugs successfully fixed - Ready for review
+    {% else %}
+    ⚠️ **Status:** Some issues require human attention - Please review carefully
+    {% endif %}
+    
+    ### Files Modified
+    {% for file in files_changed %}
+    {% if not file.filename.endswith('.md') %}
+    - 🔧 `{{ file.filename }}`
+    {% endif %}
+    {% endfor %}
+    
+    ---
+    **Generated by:** AI Bug Fixer v2.0.0  
+    **Trigger:** {{ github_context.event_name }} on {{ github_context.ref }}  
+    **Commit:** {{ github_context.sha }}
+    
+  pr_labels: ["ai-generated", "bug-fix", "automated", "needs-review"]
+  pr_reviewers: ["tech-lead", "senior-dev"]
+  target_branch: "main"
+  delete_branch_on_merge: true
+
+enabled: true
+priority: 5 

@@ -1,0 +1,185 @@
+agent:
+  type: "codex"
+  name: "bug-report-processor"
+  description: "Processes bug reports and creates initial investigation files"
+  version: "1.0.0"
+
+configuration:
+  model: "gpt-4"
+  max_tokens: 3000
+  temperature: 0.2
+
+triggers:
+  event_actions: ["opened", "labeled"]
+  
+  conditions:
+    - "{{ event.issue.labels | selectattr('name', 'equalto', 'bug') | list | length > 0 }}"
+    - "{{ event.action == 'opened' or (event.action == 'labeled' and event.label.name == 'bug') }}"
+
+prompt_template: |
+  You are a senior software engineer with direct file system access. You can analyze bug reports and explore the repository to create comprehensive investigation plans.
+  
+  ## Bug Report Context
+  - **Repository:** {{ github_context.repository }}
+  - **Issue:** #{{ event.issue.number }} - {{ event.issue.title }}
+  - **Reporter:** {{ event.issue.user.login }}
+  - **Created:** {{ event.issue.created_at }}
+  - **Workspace:** {{ github_context.workspace }}
+  
+  ## Bug Report Details
+  **Description:**
+  {{ event.issue.body }}
+  
+  **Labels:** {{ event.issue.labels | map(attribute='name') | join(', ') }}
+  
+  ## Your File-Based Investigation Workflow
+  
+  1. **Analyze Bug Report:**
+     - Read and understand the complete bug description
+     - Identify key symptoms and error patterns
+     - Extract relevant technical details
+  
+  2. **Explore Repository:**
+     - Use file access to examine codebase structure
+     - Read relevant source files based on bug description
+     - Identify potentially affected components
+     - Check test files and documentation
+  
+  3. **Create Investigation File:**
+     - Write comprehensive analysis: `bug-investigations/issue-{{ event.issue.number }}.md`
+     - Include classification, hypothesis, and investigation plan
+     - Provide actionable debugging steps
+  
+  4. **Generate Analysis Summary:**
+     - Write concise summary to: `/tmp/bug-analysis-summary.md`
+     - This will be used for artifact output
+  
+  ## Investigation File Format (write to `bug-investigations/issue-{{ event.issue.number }}.md`)
+  
+  ```markdown
+  # 🐛 Bug Investigation: Issue #{{ event.issue.number }}
+  
+  **Title:** {{ event.issue.title }}
+  **Reporter:** @{{ event.issue.user.login }}
+  **Date:** [Current timestamp]
+  **Repository:** {{ github_context.repository }}
+  
+  ## Bug Report Summary
+  [Concise summary of the reported issue]
+  
+  ## Bug Classification
+  - **Severity:** Critical/High/Medium/Low
+  - **Type:** UI/Logic/Performance/Security/Configuration/etc.
+  - **Component:** [Affected modules/components]
+  - **Platform:** [If platform-specific]
+  
+  ## Symptoms Analysis
+  [Detailed analysis of reported symptoms]
+  
+  ## Root Cause Hypothesis
+  ### Primary Hypothesis
+  [Most likely cause based on analysis]
+  
+  ### Alternative Hypotheses
+  [Other possible causes to investigate]
+  
+  ### Code Areas of Interest
+  [Based on repository exploration:]
+  - `file1.py` - [Why this file is relevant]
+  - `file2.js` - [Connection to reported issue]
+  - `config/settings.yml` - [Configuration aspect]
+  
+  ## Investigation Plan
+  ### Phase 1: Initial Analysis
+  1. [Step-by-step debugging approach]
+  2. [Files and functions to examine first]
+  3. [Log files or data to collect]
+  
+  ### Phase 2: Deep Dive
+  1. [More detailed investigation steps]
+  2. [Testing scenarios to try]
+  3. [Dependencies to check]
+  
+  ## Reproduction Steps
+  ### Environment Setup
+  [Required environment and setup steps]
+  
+  ### Step-by-Step Reproduction
+  1. [Detailed reproduction steps]
+  2. [Expected vs actual behavior]
+  3. [Variations to try]
+  
+  ## Initial Recommendations
+  - **Priority:** [High/Medium/Low based on severity]
+  - **Immediate Workarounds:** [If any exist]
+  - **Assigned Team:** [Suggested team/person]
+  - **Estimated Effort:** [Time/complexity estimate]
+  - **Dependencies:** [Blocking issues or requirements]
+  
+  ## Related Issues
+  [Links to similar or related issues found]
+  
+  ## Investigation Notes
+  [Space for ongoing investigation updates]
+  ```
+  
+  ## Summary Format (write to `/tmp/bug-analysis-summary.md`)
+  
+  Create a concise summary for artifact output:
+  - Bug classification and severity
+  - Primary hypothesis
+  - Investigation priority
+  - Recommended next steps
+  
+  ## Important Notes
+  - You have full read access to explore the repository
+  - Create the `bug-investigations/` directory if it doesn't exist
+  - Use repository exploration to inform your analysis
+  - Provide specific, actionable investigation steps
+
+output:
+  format: "markdown"
+  destination: "artifact"
+  output_file: "/tmp/bug-analysis-summary.md"
+  file_path: "bug-analysis-{{ event.issue.number }}.md"
+
+# Branch automation to create investigation branch
+branch_automation:
+  enabled: true
+  branch_prefix: "bug/{{ event.issue.number }}"
+  commit_message: "🐛 Create investigation file for issue #{{ event.issue.number }}: {{ event.issue.title }}"
+  
+  create_pull_request: true
+  pr_title: "🐛 Bug Investigation: {{ event.issue.title }} (Issue #{{ event.issue.number }})"
+  pr_body: |
+    ## Bug Investigation for Issue #{{ event.issue.number }}
+    
+    **Original Issue:** [#{{ event.issue.number }}]({{ event.issue.html_url }})
+    **Reporter:** @{{ event.issue.user.login }}
+    
+    This PR contains the initial investigation and analysis for the reported bug.
+    
+    ### Investigation File
+    - Added comprehensive bug analysis
+    - Included root cause hypotheses
+    - Created step-by-step investigation plan
+    - Provided reproduction steps
+    
+    ### Next Steps
+    1. Review the investigation plan
+    2. Assign to appropriate team member
+    3. Begin debugging following the suggested approach
+    4. Update issue with findings
+    
+    **Auto-generated by:** {{ agent.name }}
+    **Triggered by:** Issue #{{ event.issue.number }}
+    
+    Fixes #{{ event.issue.number }}
+    
+  pr_labels: ["bug", "investigation", "triage"]
+  pr_assignees: ["{{ event.issue.user.login }}"]
+  pr_reviewers: []
+  target_branch: "main"
+
+enabled: true
+priority: 20 

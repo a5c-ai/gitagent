@@ -28,7 +28,17 @@ from .models import (
     CommitHistory,
     OutputDestination,
     McpServerConfig,
+    FileChange,
 )
+from .git_operations import (
+    GitOperations,
+    GitHubAPI,
+    BranchAutomationManager,
+    extract_file_changes_from_event,
+    GitOperationError,
+    GitHubAPIError,
+)
+from .template_functions import render_template_with_file_inclusion
 
 logger = structlog.get_logger()
 
@@ -36,7 +46,7 @@ logger = structlog.get_logger()
 class AgentManager:
     """Manages AI agent discovery, configuration, and execution."""
     
-    def __init__(self):
+    def __init__(self, github_token: Optional[str] = None):
         self.jinja_env = Environment(
             loader=FileSystemLoader("."),
             autoescape=False,
@@ -46,6 +56,11 @@ class AgentManager:
         self._agent_cache: Dict[str, List[AgentDefinition]] = {}
         self._cache_timestamp: float = 0
         self._cache_ttl: float = 300  # 5 minutes
+        
+        # Git operations (initialized when needed)
+        self._git_ops: Optional[GitOperations] = None
+        self._branch_automation: Optional[BranchAutomationManager] = None
+        self._github_token = github_token
     
     async def discover_agents(
         self,
@@ -177,6 +192,25 @@ class AgentManager:
         self._agent_cache.clear()
         self._cache_timestamp = 0
     
+    def _get_git_ops(self, workspace_path: Optional[str] = None) -> GitOperations:
+        """Get or create GitOperations instance."""
+        if self._git_ops is None:
+            workspace = workspace_path or settings.github_workspace
+            self._git_ops = GitOperations(settings, workspace)
+        return self._git_ops
+    
+    def _get_branch_automation(self, workspace_path: Optional[str] = None) -> Optional[BranchAutomationManager]:
+        """Get or create BranchAutomationManager instance."""
+        if not self._github_token:
+            return None
+        
+        if self._branch_automation is None:
+            workspace = workspace_path or settings.github_workspace
+            self._branch_automation = BranchAutomationManager(
+                settings, self._github_token, workspace
+            )
+        return self._branch_automation
+    
     async def filter_agents(
         self,
         agents: List[AgentDefinition],
@@ -185,10 +219,18 @@ class AgentManager:
         commit_history: Optional[CommitHistory] = None
     ) -> List[AgentDefinition]:
         """Filter agents based on trigger conditions."""
+        # Extract file changes from event if needed
+        file_changes = []
+        try:
+            git_ops = self._get_git_ops()
+            file_changes = await extract_file_changes_from_event(event, git_ops)
+        except Exception as e:
+            logger.warning("Failed to extract file changes", error=str(e))
+        
         filtered_agents = []
         
         for agent in agents:
-            if await self._should_run_agent(agent, event, github_context, commit_history):
+            if await self._should_run_agent(agent, event, github_context, commit_history, file_changes):
                 filtered_agents.append(agent)
         
         # Sort by priority (lower number = higher priority)
@@ -201,10 +243,12 @@ class AgentManager:
         agent: AgentDefinition,
         event: GitHubEvent,
         github_context: GitHubActionContext,
-        commit_history: Optional[CommitHistory] = None
+        commit_history: Optional[CommitHistory] = None,
+        file_changes: Optional[List[FileChange]] = None
     ) -> bool:
         """Check if an agent should run based on trigger conditions."""
         triggers = agent.triggers
+        file_changes = file_changes or []
         
         # Check branch patterns
         if triggers.branches and github_context.ref:
@@ -257,12 +301,24 @@ class AgentManager:
             ):
                 return False
         
+        # Check specific file change patterns
+        if triggers.files_changed and file_changes:
+            changed_filenames = [fc.filename for fc in file_changes]
+            
+            if not any(
+                fnmatch.fnmatch(filename, pattern)
+                for filename in changed_filenames
+                for pattern in triggers.files_changed
+            ):
+                return False
+        
         # Check Jinja2 template conditions
         if triggers.conditions:
             template_context = {
                 'event': event.dict(),
                 'github_context': github_context.dict(),
                 'commit_history': commit_history.dict() if commit_history else None,
+                'files_changed': [fc.dict() for fc in (file_changes or [])],
             }
             
             for condition in triggers.conditions:
@@ -288,14 +344,15 @@ class AgentManager:
         agents: List[AgentDefinition],
         event: GitHubEvent,
         github_context: GitHubActionContext,
-        commit_history: Optional[CommitHistory] = None
+        commit_history: Optional[CommitHistory] = None,
+        file_changes: Optional[List[FileChange]] = None
     ) -> List[AgentExecutionResult]:
         """Execute a list of agents."""
         results = []
         
         for agent in agents:
             try:
-                result = await self.execute_agent(agent, event, github_context, commit_history)
+                result = await self.execute_agent(agent, event, github_context, commit_history, file_changes)
                 results.append(result)
             except Exception as e:
                 logger.error(
@@ -319,12 +376,14 @@ class AgentManager:
         agent: AgentDefinition,
         event: GitHubEvent,
         github_context: GitHubActionContext,
-        commit_history: Optional[CommitHistory] = None
+        commit_history: Optional[CommitHistory] = None,
+        file_changes: Optional[List[FileChange]] = None
     ) -> AgentExecutionResult:
         """Execute a single agent."""
         start_time = time.time()
         agent_name = agent.agent.get('name', 'unknown')
         agent_type = AgentType(agent.agent.get('type', 'custom'))
+        file_changes = file_changes or []
         
         logger.info(
             "Executing agent",
@@ -334,18 +393,84 @@ class AgentManager:
         )
         
         try:
+            # Enhance file changes with content/diff if requested
+            enhanced_file_changes = await self._enhance_file_changes(agent, file_changes)
+            
             # Render the prompt template
             rendered_prompt = await self._render_prompt_template(
-                agent, event, github_context, commit_history
+                agent, event, github_context, commit_history, enhanced_file_changes
             )
             
             # Execute the agent CLI
             output = await self._execute_agent_cli(agent, rendered_prompt)
             
-            # Handle output destination
-            await self._handle_agent_output(agent, output, github_context)
+            # Initialize result with base information
+            result = AgentExecutionResult(
+                agent_name=agent_name,
+                agent_type=agent_type,
+                success=True,
+                output=output,
+                execution_time=0.0,  # Will be updated below
+                output_destination=agent.output.destination,
+                files_changed=enhanced_file_changes,
+                metadata={
+                    'prompt_length': len(rendered_prompt),
+                    'output_length': len(output),
+                }
+            )
+            
+            # Handle branch automation if enabled
+            if agent.branch_automation and agent.branch_automation.enabled:
+                branch_automation = self._get_branch_automation()
+                if branch_automation:
+                    try:
+                        template_vars = {
+                            'event': event.dict(),
+                            'github_context': github_context.dict(),
+                            'commit_history': commit_history.dict() if commit_history else None,
+                            'agent': agent.dict(),
+                            'config': agent.configuration,
+                            'files_changed': [fc.dict() for fc in enhanced_file_changes],
+                        }
+                        
+                        branch_name, pr_number, pr_url = await branch_automation.execute_branch_workflow(
+                            agent.branch_automation,
+                            agent_name,
+                            output,
+                            github_context,
+                            event,
+                            template_vars
+                        )
+                        
+                        result.branch_created = branch_name
+                        result.pr_created = pr_number
+                        result.pr_url = pr_url
+                        
+                        logger.info(
+                            "Branch automation completed",
+                            agent=agent_name,
+                            branch_created=branch_name,
+                            pr_created=pr_number
+                        )
+                    except Exception as e:
+                        logger.error(
+                            "Branch automation failed",
+                            agent=agent_name,
+                            error=str(e)
+                        )
+                        result.metadata['branch_automation_error'] = str(e)
+            
+            # Handle regular output destination and GitHub integrations
+            github_results = await self._handle_agent_output(agent, output, github_context, event, enhanced_file_changes)
+            
+            # Update result with GitHub integration results
+            result.status_check_posted = github_results.get('status_check_posted')
+            result.comment_posted = github_results.get('comment_posted')
+            result.issue_created = github_results.get('issue_created')
+            result.issue_url = github_results.get('issue_url')
             
             execution_time = time.time() - start_time
+            result.execution_time = execution_time
             
             logger.info(
                 "Agent executed successfully",
@@ -354,18 +479,7 @@ class AgentManager:
                 output_length=len(output)
             )
             
-            return AgentExecutionResult(
-                agent_name=agent_name,
-                agent_type=agent_type,
-                success=True,
-                output=output,
-                execution_time=execution_time,
-                output_destination=agent.output.destination,
-                metadata={
-                    'prompt_length': len(rendered_prompt),
-                    'output_length': len(output),
-                }
-            )
+            return result
         
         except Exception as e:
             execution_time = time.time() - start_time
@@ -385,25 +499,77 @@ class AgentManager:
                 output_destination=agent.output.destination
             )
     
+    async def _enhance_file_changes(
+        self,
+        agent: AgentDefinition,
+        file_changes: List[FileChange]
+    ) -> List[FileChange]:
+        """Enhance file changes with content and diff if requested."""
+        if not file_changes:
+            return file_changes
+        
+        triggers = agent.triggers
+        
+        # Check if we need to enhance with content or diff
+        if not (triggers.include_file_content or triggers.include_file_diff):
+            return file_changes
+        
+        try:
+            git_ops = self._get_git_ops()
+            enhanced_changes = []
+            
+            for file_change in file_changes:
+                enhanced_change = file_change.copy()
+                
+                if triggers.include_file_content:
+                    # Get current file content
+                    enhanced_change.content = await git_ops.get_file_content(file_change.filename)
+                
+                if triggers.include_file_diff and file_change.patch is None:
+                    # Try to get diff from git if not already present
+                    # This would require before/after commit SHAs which may not be available
+                    # in all contexts, so we'll leave it as is for now
+                    pass
+                
+                enhanced_changes.append(enhanced_change)
+            
+            return enhanced_changes
+            
+        except Exception as e:
+            logger.warning(
+                "Failed to enhance file changes",
+                agent=agent.agent.get('name', 'unknown'),
+                error=str(e)
+            )
+            return file_changes
+    
     async def _render_prompt_template(
         self,
         agent: AgentDefinition,
         event: GitHubEvent,
         github_context: GitHubActionContext,
-        commit_history: Optional[CommitHistory] = None
+        commit_history: Optional[CommitHistory] = None,
+        file_changes: Optional[List[FileChange]] = None
     ) -> str:
-        """Render the agent's prompt template with context variables."""
+        """Render the agent's prompt template with context variables and file inclusion support."""
         template_context = {
             'event': event.dict(),
             'github_context': github_context.dict(),
             'commit_history': commit_history.dict() if commit_history else None,
+            'files_changed': [fc.dict() for fc in (file_changes or [])],
             'agent': agent.agent,
             'config': agent.configuration,
         }
         
         try:
-            template = Template(agent.prompt_template)
-            return template.render(**template_context)
+            # Use enhanced template rendering with file inclusion support
+            return render_template_with_file_inclusion(
+                template_str=agent.prompt_template,
+                context_vars=template_context,
+                workspace_path=github_context.workspace,
+                files_changed=file_changes or [],
+                github_context=github_context
+            )
         except Exception as e:
             logger.error(
                 "Failed to render prompt template",
@@ -500,16 +666,50 @@ class AgentManager:
         self,
         agent: AgentDefinition,
         output: str,
-        github_context: GitHubActionContext
-    ) -> None:
+        github_context: GitHubActionContext,
+        event: GitHubEvent,
+        file_changes: List[FileChange]
+    ) -> Dict[str, Any]:
         """Handle agent output based on configured destination."""
         destination = agent.output.destination
+        results = {}
+        
+        # For file-based outputs, read from the specified file
+        if agent.output.output_file:
+            try:
+                with open(agent.output.output_file, 'r', encoding='utf-8') as f:
+                    output = f.read()
+                logger.info(
+                    "Read agent output from file",
+                    agent=agent.agent.get('name', 'unknown'),
+                    output_file=agent.output.output_file,
+                    output_length=len(output)
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to read output file, using direct output",
+                    agent=agent.agent.get('name', 'unknown'),
+                    output_file=agent.output.output_file,
+                    error=str(e)
+                )
         
         # Apply output template if specified
         if agent.output.template:
             try:
-                template = Template(agent.output.template)
-                output = template.render(output=output, agent=agent.agent)
+                template_vars = {
+                    'output': output,
+                    'agent': agent.agent,
+                    'event': event.dict(),
+                    'github_context': github_context.dict(),
+                    'files_changed': [fc.dict() for fc in file_changes]
+                }
+                output = render_template_with_file_inclusion(
+                    template_str=agent.output.template,
+                    context_vars=template_vars,
+                    workspace_path=github_context.workspace,
+                    files_changed=file_changes,
+                    github_context=github_context
+                )
             except Exception as e:
                 logger.warning(
                     "Failed to apply output template",
@@ -553,14 +753,316 @@ class AgentManager:
                 artifact_path=str(artifact_file)
             )
         
-        # For other destinations (COMMENT, PR_REVIEW, ISSUE), we would need
-        # GitHub API integration, which is not implemented in this stub version
+        elif destination == OutputDestination.STATUS_CHECK:
+            # Post status check to GitHub
+            if self._github_token:
+                await self._handle_status_check(agent, output, github_context, results)
+        
+        elif destination == OutputDestination.COMMENT:
+            # Post comment to PR/issue
+            if self._github_token:
+                await self._handle_comment(agent, output, github_context, event, results, file_changes)
+        
+        elif destination == OutputDestination.CREATE_ISSUE:
+            # Create new issue
+            if self._github_token:
+                await self._handle_create_issue(agent, output, github_context, event, file_changes, results)
+        
         else:
             logger.info(
                 "Agent output ready for destination",
                 agent=agent.agent.get('name', 'unknown'),
                 destination=destination,
                 output_length=len(output)
+            )
+        
+        return results
+    
+    async def _handle_status_check(
+        self,
+        agent: AgentDefinition,
+        output: str,
+        github_context: GitHubActionContext,
+        results: Dict[str, Any]
+    ) -> None:
+        """Handle posting a status check to GitHub."""
+        try:
+            github_api = GitHubAPI(self._github_token)
+            
+            # Determine status based on keywords in output
+            state = "success"  # Default to success
+            if agent.output.status_check_failure_on:
+                for keyword in agent.output.status_check_failure_on:
+                    if keyword.lower() in output.lower():
+                        state = "failure"
+                        break
+            
+            if state == "success" and agent.output.status_check_success_on:
+                # Only consider success if success keywords are found
+                found_success = False
+                for keyword in agent.output.status_check_success_on:
+                    if keyword.lower() in output.lower():
+                        found_success = True
+                        break
+                if not found_success:
+                    state = "error"  # Neither success nor failure keywords found
+            
+            # Get repository info
+            repository_parts = github_context.repository.split('/')
+            owner, repo = repository_parts[0], repository_parts[1]
+            
+            # Use SHA from context
+            sha = github_context.sha
+            
+            # Status check name
+            context = agent.output.status_check_name or f"AI Agent: {agent.agent.get('name', 'unknown')}"
+            
+            # Description (first 140 chars of output)
+            description = output[:140].replace('\n', ' ').strip()
+            if len(output) > 140:
+                description += "..."
+            
+            success = await github_api.create_status_check(
+                owner=owner,
+                repo=repo,
+                sha=sha,
+                state=state,
+                context=context,
+                description=description
+            )
+            
+            if success:
+                results['status_check_posted'] = state
+                logger.info(
+                    "Status check posted successfully",
+                    agent=agent.agent.get('name', 'unknown'),
+                    state=state,
+                    context=context
+                )
+            else:
+                logger.error(
+                    "Failed to post status check",
+                    agent=agent.agent.get('name', 'unknown')
+                )
+                
+        except Exception as e:
+            logger.error(
+                "Error posting status check",
+                agent=agent.agent.get('name', 'unknown'),
+                error=str(e)
+            )
+    
+    async def _handle_comment(
+        self,
+        agent: AgentDefinition,
+        output: str,
+        github_context: GitHubActionContext,
+        event: GitHubEvent,
+        results: Dict[str, Any],
+        file_changes: Optional[List[FileChange]] = None
+    ) -> None:
+        """Handle posting a comment to a PR or issue."""
+        try:
+            github_api = GitHubAPI(self._github_token)
+            
+            # Get repository info
+            repository_parts = github_context.repository.split('/')
+            owner, repo = repository_parts[0], repository_parts[1]
+            
+            # Determine issue/PR number from event
+            issue_number = None
+            if hasattr(event, 'pull_request') and event.pull_request:
+                issue_number = event.pull_request.get('number')
+            elif hasattr(event, 'issue') and event.issue:
+                issue_number = event.issue.get('number')
+            
+            if not issue_number:
+                logger.warning(
+                    "No PR or issue number found for comment",
+                    agent=agent.agent.get('name', 'unknown'),
+                    event_type=github_context.event_name
+                )
+                return
+            
+            # Prepare comment body - read from file if specified
+            comment_body = output
+            if agent.output.comment_output_file:
+                try:
+                    with open(agent.output.comment_output_file, 'r', encoding='utf-8') as f:
+                        comment_body = f.read()
+                    logger.info(
+                        "Read comment content from file",
+                        agent=agent.agent.get('name', 'unknown'),
+                        comment_file=agent.output.comment_output_file
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to read comment file, using output",
+                        agent=agent.agent.get('name', 'unknown'),
+                        comment_file=agent.output.comment_output_file,
+                        error=str(e)
+                    )
+            elif agent.output.comment_template:
+                try:
+                    template_vars = {
+                        'output': output,
+                        'agent': agent.agent,
+                        'event': event.dict(),
+                        'github_context': github_context.dict(),
+                        'comment_output_content': comment_body
+                    }
+                    comment_body = render_template_with_file_inclusion(
+                        template_str=agent.output.comment_template,
+                        context_vars=template_vars,
+                        workspace_path=github_context.workspace,
+                        files_changed=file_changes,
+                        github_context=github_context
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to apply comment template",
+                        agent=agent.agent.get('name', 'unknown'),
+                        error=str(e)
+                    )
+            
+            comment_url = await github_api.create_comment(
+                owner=owner,
+                repo=repo,
+                issue_number=issue_number,
+                body=comment_body
+            )
+            
+            if comment_url:
+                results['comment_posted'] = comment_url
+                logger.info(
+                    "Comment posted successfully",
+                    agent=agent.agent.get('name', 'unknown'),
+                    comment_url=comment_url
+                )
+            else:
+                logger.error(
+                    "Failed to post comment",
+                    agent=agent.agent.get('name', 'unknown')
+                )
+                
+        except Exception as e:
+            logger.error(
+                "Error posting comment",
+                agent=agent.agent.get('name', 'unknown'),
+                error=str(e)
+            )
+    
+    async def _handle_create_issue(
+        self,
+        agent: AgentDefinition,
+        output: str,
+        github_context: GitHubActionContext,
+        event: GitHubEvent,
+        file_changes: List[FileChange],
+        results: Dict[str, Any]
+    ) -> None:
+        """Handle creating a new GitHub issue."""
+        try:
+            github_api = GitHubAPI(self._github_token)
+            
+            # Get repository info
+            repository_parts = github_context.repository.split('/')
+            owner, repo = repository_parts[0], repository_parts[1]
+            
+            # For create_issue destination, the body should come from output_file if specified
+            issue_body = output
+            if agent.output.output_file:
+                try:
+                    with open(agent.output.output_file, 'r', encoding='utf-8') as f:
+                        issue_body = f.read()
+                    logger.info(
+                        "Read issue content from output file",
+                        agent=agent.agent.get('name', 'unknown'),
+                        output_file=agent.output.output_file
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to read issue content from output file, using direct output",
+                        agent=agent.agent.get('name', 'unknown'),
+                        output_file=agent.output.output_file,
+                        error=str(e)
+                    )
+            
+            # Prepare template variables
+            template_vars = {
+                'output': issue_body,
+                'agent': agent.agent,
+                'event': event.dict(),
+                'github_context': github_context.dict(),
+                'files_changed': [fc.dict() for fc in file_changes]
+            }
+            
+            # Issue title
+            title = f"AI Agent Report: {agent.agent.get('name', 'unknown')}"
+            if agent.output.issue_title_template:
+                try:
+                    title = render_template_with_file_inclusion(
+                        template_str=agent.output.issue_title_template,
+                        context_vars=template_vars,
+                        workspace_path=github_context.workspace,
+                        files_changed=file_changes,
+                        github_context=github_context
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to apply issue title template",
+                        agent=agent.agent.get('name', 'unknown'),
+                        error=str(e)
+                    )
+            
+            # Issue body - use the content from output_file or direct output
+            body = issue_body
+            if agent.output.issue_body_template:
+                try:
+                    body = render_template_with_file_inclusion(
+                        template_str=agent.output.issue_body_template,
+                        context_vars=template_vars,
+                        workspace_path=github_context.workspace,
+                        files_changed=file_changes,
+                        github_context=github_context
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to apply issue body template",
+                        agent=agent.agent.get('name', 'unknown'),
+                        error=str(e)
+                    )
+            
+            issue_number, issue_url = await github_api.create_issue(
+                owner=owner,
+                repo=repo,
+                title=title,
+                body=body,
+                labels=agent.output.issue_labels or None,
+                assignees=agent.output.issue_assignees or None,
+                milestone=None  # Would need milestone number, not name
+            )
+            
+            if issue_number and issue_url:
+                results['issue_created'] = issue_number
+                results['issue_url'] = issue_url
+                logger.info(
+                    "Issue created successfully",
+                    agent=agent.agent.get('name', 'unknown'),
+                    issue_number=issue_number,
+                    issue_url=issue_url
+                )
+            else:
+                logger.error(
+                    "Failed to create issue",
+                    agent=agent.agent.get('name', 'unknown')
+                )
+                
+        except Exception as e:
+            logger.error(
+                "Error creating issue",
+                agent=agent.agent.get('name', 'unknown'),
+                error=str(e)
             )
     
     def get_agent_statistics(self) -> Dict[str, Any]:

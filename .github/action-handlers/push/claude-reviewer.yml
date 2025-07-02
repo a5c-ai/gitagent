@@ -20,84 +20,116 @@ triggers:
   files_changed_max: 50
 
 prompt_template: |
-  # Code Review Request
+  You are an expert code reviewer with direct file system access. You can read and analyze repository files to provide comprehensive code reviews.
   
-  ## Repository Information
+  ## Repository Context
   - **Repository**: {{ github_context.repository }}
   - **Branch**: {{ github_context.ref | replace("refs/heads/", "") }}
   - **Actor**: {{ github_context.actor }}
   - **Event**: {{ github_context.event_name }}
+  - **Workspace**: {{ github_context.workspace }}
   
-  ## Commit History Context
-  {% if commit_history %}
-  **Recent Commits** ({{ commit_history.total_commits }} total):
-  {% for commit in commit_history.commits[:5] %}
-  - `{{ commit.sha[:8] }}`: {{ commit.message }} by {{ commit.author_name }}
-  {% endfor %}
-  {% endif %}
-  
-  ## Changes to Review
+  ## Files Changed in Recent Commits
   {% if event.commits %}
-  **Commits in this push**:
   {% for commit in event.commits %}
-  - **{{ commit.id[:8] }}**: {{ commit.message }}
-    - Author: {{ commit.author.name }} <{{ commit.author.email }}>
-    - Modified files: {{ commit.modified | length }}, Added: {{ commit.added | length }}, Removed: {{ commit.removed | length }}
+  **Commit {{ commit.id[:8] }}**: {{ commit.message }}
+  - Modified: {{ commit.modified | join(', ') }}
+  - Added: {{ commit.added | join(', ') }}
+  - Removed: {{ commit.removed | join(', ') }}
   {% endfor %}
   {% endif %}
   
-  ## Review Guidelines
-  Please provide a comprehensive code review focusing on:
+  ## Your File-Based Review Workflow
   
-  1. **Code Quality**
-     - Code structure and organization
-     - Naming conventions and clarity
-     - Code duplication and DRY principles
-     - Error handling and edge cases
+  1. **Read and Analyze Changed Files:**
+     - Read each modified/added file directly from the repository
+     - Examine complete file context, not just diffs
+     - Understand the changes in broader codebase context
   
-  2. **Security**
-     - Input validation and sanitization
-     - Authentication and authorization
-     - Data exposure and privacy
-     - Dependency vulnerabilities
+  2. **Comprehensive Review Analysis:**
+     - **Code Quality** - structure, naming, DRY principles, error handling
+     - **Security** - input validation, auth, privacy, vulnerabilities
+     - **Performance** - efficiency, resource usage, optimization opportunities
+     - **Best Practices** - conventions, patterns, testing, documentation
+     - **Maintainability** - complexity, coupling, configuration, logging
   
-  3. **Performance**
-     - Algorithm efficiency
-     - Resource usage
-     - Caching opportunities
-     - Database query optimization
+  3. **Write Review Report:**
+     - Create comprehensive review: `code-reviews/review-{{ github_context.sha[:8] }}.md`
+     - Include detailed findings and recommendations
+     - Provide actionable feedback for developers
   
-  4. **Best Practices**
-     - Language-specific conventions
-     - Design patterns
-     - Testing coverage
-     - Documentation quality
+  4. **Generate Review Summary:**
+     - Write concise summary to: `/tmp/code-review-summary.md`
+     - This will be used for artifact output
   
-  5. **Maintainability**
-     - Code complexity
-     - Modularity and coupling
-     - Configuration management
-     - Logging and monitoring
+  ## Review Report Format (write to `code-reviews/review-{{ github_context.sha[:8] }}.md`)
   
-  ## Output Format
-  Please structure your review as:
+  ```markdown
+  # 📋 Code Review Report
   
-  ### Summary
-  Brief overall assessment of the changes.
+  **Date:** [Current timestamp]
+  **Repository:** {{ github_context.repository }}
+  **Branch:** {{ github_context.ref }}
+  **Commit:** {{ github_context.sha }}
+  **Reviewer:** AI Code Reviewer
   
-  ### Strengths
-  What was done well in these changes.
+  ## Executive Summary
+  [Brief overall assessment of the changes]
   
-  ### Issues Found
-  - **Critical**: Security vulnerabilities, breaking changes
-  - **Major**: Performance issues, architectural problems
-  - **Minor**: Style issues, minor improvements
+  ## Files Reviewed
+  [List each file analyzed with brief summary]
   
-  ### Recommendations
-  Specific actionable recommendations for improvement.
+  ## Detailed Findings
   
-  ### Security Assessment
-  Specific security-related findings and recommendations.
+  ### ✅ Strengths
+  [What was done well in these changes]
+  
+  ### ⚠️ Issues Found
+  
+  #### 🚨 Critical Issues
+  [Security vulnerabilities, breaking changes]
+  
+  #### 📊 Major Issues  
+  [Performance issues, architectural problems]
+  
+  #### 🔧 Minor Issues
+  [Style issues, minor improvements]
+  
+  ### 💡 Recommendations
+  [Specific actionable recommendations for improvement]
+  
+  ### 🔒 Security Assessment
+  [Security-related findings and recommendations]
+  
+  ### 🚀 Performance Notes
+  [Performance considerations and optimization opportunities]
+  
+  ### 📚 Documentation & Testing
+  [Comments on docs and test coverage]
+  
+  ## Action Items
+  [Prioritized list of recommended changes]
+  
+  ## Overall Assessment
+  **Quality Score:** [1-10]
+  **Security Risk:** [Low/Medium/High]
+  **Performance Impact:** [Positive/Neutral/Negative]
+  **Readiness:** [Ready/Needs Work/Major Issues]
+  ```
+  
+  ## Summary Format (write to `/tmp/code-review-summary.md`)
+  
+  Create a concise summary for artifact output:
+  - Overall quality assessment
+  - Key issues identified
+  - Critical recommendations
+  - Approval status
+  
+  ## Important Notes
+  - You have full read access to analyze all repository files
+  - Create the `code-reviews/` directory if it doesn't exist
+  - Focus on providing actionable, constructive feedback
+  - Consider the broader impact of changes on the codebase
 
 mcp_servers:
   - name: "github-server"
@@ -117,23 +149,9 @@ mcp_servers:
 output:
   format: "markdown"
   destination: "artifact"
+  output_file: "/tmp/code-review-summary.md"
   file_path: "code-review-{{ github_context.sha[:8] }}.md"
   max_length: 8000
-  template: |
-    # Code Review - {{ github_context.repository }}
-    
-    **Commit**: {{ github_context.sha[:8] }}  
-    **Branch**: {{ github_context.ref | replace("refs/heads/", "") }}  
-    **Reviewer**: {{ agent.name }}  
-    **Date**: {{ "now" | strftime("%Y-%m-%d %H:%M:%S UTC") }}
-    
-    ---
-    
-    {{ output }}
-    
-    ---
-    
-    *Generated by {{ agent.name }} ({{ agent.type }}) - Version {{ agent.version }}*
 
 enabled: true
 priority: 10 

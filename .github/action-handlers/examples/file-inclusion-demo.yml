@@ -1,0 +1,111 @@
+agent:
+  type: "claude"
+  name: "file-inclusion-demo"
+  description: "Demonstrates advanced file inclusion with wildcards and relative paths"
+  version: "1.0.0"
+
+configuration:
+  model: "claude-3-sonnet-20241022"
+  max_tokens: 6000
+  temperature: 0.1
+
+triggers:
+  branches: ["main", "develop", "feature/*"]
+  event_actions: ["opened", "synchronize"]
+  
+  # Monitor code file changes
+  files_changed: ["src/**/*.py", "lib/**/*.js", "docs/**/*.md"]
+  include_file_content: true
+  include_file_diff: true
+  file_diff_context: 3
+
+prompt_template: |
+  You are an expert code analyst with access to project documentation and configuration files.
+  
+  ## Repository Context
+  - **Repository:** {{ github_context.repository }}
+  - **Workspace:** {{ github_context.workspace }}
+  - **Event:** {{ github_context.event_name }}
+  
+  ## Changed Files
+  {% for file in files_changed %}
+  - **{{ file.filename }}** ({{ file.status }})
+  {% endfor %}
+  
+  ## Project Instructions and Documentation
+  
+  ### Global Instructions
+  {{ include("$WORKSPACE/.github/instructions.md") }}
+  {{ include("$WORKSPACE/CONTRIBUTING.md") }}
+  {{ include("$WORKSPACE/README.md") }}
+  
+  ### Directory-Specific Instructions
+  Here are instructions specific to the directories that contain changed files:
+  
+  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS_AND_THEIR_ANCESTORS/.instructions.md") }}
+  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS_AND_THEIR_ANCESTORS/.coding-standards.md") }}
+  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS_AND_THEIR_ANCESTORS/README.md") }}
+  
+  ### Configuration Files
+  Relevant configuration files for changed directories:
+  
+  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS/**/config.yml") }}
+  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS/**/settings.json") }}
+  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS/**/.env.example") }}
+  
+  ### Testing Guidelines
+  Testing instructions for the changed file areas:
+  
+  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS_AND_THEIR_ANCESTORS/test-*.md") }}
+  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS_AND_THEIR_ANCESTORS/**/testing-guide.md") }}
+  
+  ### Advanced Pattern Examples
+  
+  #### Include all markdown files in any subdirectory of changed file directories:
+  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS/**/*.md") }}
+  
+  #### Include specific config files relative to each changed file:
+  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS_AND_THEIR_ANCESTORS/.something/**/instructions-*.md") }}
+  
+  #### Include template files from changed directories:
+  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS/**/templates/*.tmpl") }}
+  {{ include("$ALL_UNIQUE_CHANGED_FILE_DIRS/**/templates/*.template") }}
+  
+  ## Your Analysis Task
+  
+  1. **Review the changed files** in context of the project documentation
+  2. **Check compliance** with directory-specific instructions
+  3. **Validate configuration** against included config files
+  4. **Assess testing** based on included testing guidelines
+  5. **Provide recommendations** based on all included documentation
+  
+  ## Output Instructions
+  
+  Write a comprehensive analysis to: `/tmp/file-inclusion-analysis.md`
+  
+  Include:
+  - Summary of changes reviewed
+  - Compliance with project guidelines
+  - Configuration issues identified
+  - Testing recommendations
+  - Overall assessment and next steps
+  
+  ## Available Variables
+  
+  You have access to these special variables in templates:
+  - `$WORKSPACE` - Repository root directory
+  - `$ALL_UNIQUE_CHANGED_FILE_DIRS` - Directories containing changed files
+  - `$ALL_UNIQUE_CHANGED_FILE_DIRS_AND_THEIR_ANCESTORS` - Above + all parent directories
+  - `$CHANGED_FILES` - List of changed file paths
+  
+  Use these to dynamically include relevant documentation and configuration files.
+
+output:
+  format: "markdown"
+  destination: "artifact"
+  output_file: "/tmp/file-inclusion-analysis.md"
+  file_path: "analysis-{{ github_context.sha[:8] }}.md"
+  max_length: 15000
+
+enabled: true
+priority: 15 

@@ -24,7 +24,7 @@ from .models import (
     GitHubCommit,
     GitHubActionContext,
 )
-from .agent_manager import agent_manager
+from .agent_manager import AgentManager
 
 logger = structlog.get_logger(__name__)
 
@@ -43,6 +43,7 @@ class BaseEventHandler:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.logger = structlog.get_logger(self.__class__.__name__)
+        self.agent_manager = AgentManager(github_token=settings.github_token)
     
     async def handle(self, event: GitHubEvent, context: GitHubActionContext) -> EventProcessingResult:
         """Handle a GitHub event with agent integration."""
@@ -63,21 +64,21 @@ class BaseEventHandler:
             if self.settings.agents_enabled:
                 try:
                     # Discover agents for this event type
-                    agents = await agent_manager.discover_agents(
+                    agents = await self.agent_manager.discover_agents(
                         context.event_name,
                         context.workspace
                     )
                     agents_discovered = len(agents)
                     
-                    # Filter agents based on trigger conditions
-                    filtered_agents = await agent_manager.filter_agents(
+                    # Filter agents based on trigger conditions (includes file change extraction)
+                    filtered_agents = await self.agent_manager.filter_agents(
                         agents, event, context, commit_history
                     )
                     agents_executed = len(filtered_agents)
                     
                     # Execute filtered agents
                     if filtered_agents:
-                        agent_results = await agent_manager.execute_agents(
+                        agent_results = await self.agent_manager.execute_agents(
                             filtered_agents, event, context, commit_history
                         )
                         
