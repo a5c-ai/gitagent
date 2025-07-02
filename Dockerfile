@@ -25,7 +25,7 @@ COPY src/ ./src/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir --user .
+    pip install --no-cache-dir .
 
 # Production stage
 FROM python:3.11-slim as production
@@ -58,7 +58,8 @@ RUN groupadd -r github-handler && \
 WORKDIR /app
 
 # Copy Python packages from builder stage
-COPY --from=builder /root/.local /home/github-handler/.local
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application source
 COPY --from=builder /app/build/src ./src
@@ -75,7 +76,6 @@ USER github-handler
 ENV PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH=/home/github-handler/.local/bin:$PATH \
     HOME=/app
 
 # Default configuration
