@@ -5,7 +5,8 @@ Configuration management for GitHub Action Handler using Pydantic Settings.
 import os
 from typing import Dict, List, Optional, Set
 
-from pydantic import BaseSettings, Field, validator
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings
 
 from .models import AgentCliConfiguration
 
@@ -116,13 +117,15 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key (used for Codex agents)")
     anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-        extra = "ignore"
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False,
+        "extra": "ignore"
+    }
     
-    @validator("log_level")
+    @field_validator("log_level")
+    @classmethod
     def validate_log_level(cls, v):
         """Validate log level."""
         valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
@@ -130,7 +133,8 @@ class Settings(BaseSettings):
             raise ValueError(f"Log level must be one of: {', '.join(valid_levels)}")
         return v.upper()
     
-    @validator("log_format")
+    @field_validator("log_format")
+    @classmethod
     def validate_log_format(cls, v):
         """Validate log format."""
         valid_formats = {"json", "console"}
@@ -138,21 +142,24 @@ class Settings(BaseSettings):
             raise ValueError(f"Log format must be one of: {', '.join(valid_formats)}")
         return v.lower()
     
-    @validator("max_concurrent_events")
+    @field_validator("max_concurrent_events")
+    @classmethod
     def validate_max_concurrent_events(cls, v):
         """Validate max concurrent events."""
         if v < 1 or v > 100:
             raise ValueError("Max concurrent events must be between 1 and 100")
         return v
     
-    @validator("event_timeout_seconds")
+    @field_validator("event_timeout_seconds")
+    @classmethod
     def validate_event_timeout(cls, v):
         """Validate event timeout."""
         if v < 1 or v > 3600:
             raise ValueError("Event timeout must be between 1 and 3600 seconds")
         return v
     
-    @validator("commit_history_count")
+    @field_validator("commit_history_count")
+    @classmethod
     def validate_commit_history_count(cls, v):
         """Validate commit history count."""
         if v < 1 or v > 100:
