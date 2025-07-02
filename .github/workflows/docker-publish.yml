@@ -1,0 +1,398 @@
+name: Build and Publish Docker Images
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      push_to_registry:
+        description: 'Push images to registry'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      security-events: write
+
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-metadata: ${{ steps.build.outputs.metadata }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        driver-opts: network=host
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      if: github.event_name != 'pull_request'
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=raw,value=latest,enable={{is_default_branch}}
+          type=sha,prefix={{branch}}-
+        labels: |
+          org.opencontainers.image.title=GitHub Action Handler
+          org.opencontainers.image.description=Comprehensive GitHub Action event handler with Docker support
+          org.opencontainers.image.vendor=Your Organization
+          org.opencontainers.image.licenses=MIT
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/README.md
+
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        target: final
+        platforms: linux/amd64,linux/arm64
+        push: ${{ (github.event_name != 'pull_request') || (github.event_name == 'workflow_dispatch' && inputs.push_to_registry) }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          VCS_REF=${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        provenance: true
+        sbom: true
+
+    - name: Build development image
+      uses: docker/build-push-action@v5
+      if: github.event_name != 'pull_request'
+      with:
+        context: .
+        target: development
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev-${{ github.sha }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          VCS_REF=${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  test-image:
+    name: Test Docker Image
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name != 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.push_to_registry)
+
+    strategy:
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+
+    steps:
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract image name
+      id: image
+      run: |
+        if [[ "${{ github.ref_type }}" == "tag" ]]; then
+          echo "name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        else
+          echo "name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Test image on ${{ matrix.platform }}
+      run: |
+        docker run --rm --platform ${{ matrix.platform }} \
+          --name test-container \
+          -e DEBUG=true \
+          -e WEBHOOK_SIGNATURE_REQUIRED=false \
+          ${{ steps.image.outputs.name }} \
+          python -c "
+        import github_action_handler
+        print('✅ GitHub Action Handler imported successfully')
+        print(f'Version: {github_action_handler.__version__}')
+        "
+
+    - name: Test container startup
+      run: |
+        # Start container in background
+        docker run --rm -d --platform ${{ matrix.platform }} \
+          --name startup-test \
+          -p 8080:8000 \
+          -e DEBUG=true \
+          -e WEBHOOK_SIGNATURE_REQUIRED=false \
+          ${{ steps.image.outputs.name }}
+
+        # Wait for container to be ready
+        timeout 60 bash -c 'until curl -f http://localhost:8080/health; do sleep 2; done'
+
+        # Test basic endpoints
+        curl -f http://localhost:8080/health
+        curl -f http://localhost:8080/events/supported
+
+        # Stop container
+        docker stop startup-test
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name != 'pull_request'
+
+    steps:
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract image name
+      id: image
+      run: |
+        if [[ "${{ github.ref_type }}" == "tag" ]]; then
+          echo "name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        else
+          echo "name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ steps.image.outputs.name }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Run Trivy vulnerability scanner (table output)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ steps.image.outputs.name }}
+        format: 'table'
+        output: 'trivy-results.txt'
+
+    - name: Upload Trivy results as artifact
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: trivy-results
+        path: |
+          trivy-results.sarif
+          trivy-results.txt
+
+  sign-image:
+    name: Sign Container Image
+    runs-on: ubuntu-latest
+    needs: [build-and-push, test-image]
+    if: github.event_name != 'pull_request' && github.ref_type == 'tag'
+
+    steps:
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Sign container image
+      env:
+        COSIGN_EXPERIMENTAL: 1
+      run: |
+        IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+        TAG="${{ github.ref_name }}"
+        
+        # Sign the image
+        cosign sign --yes "${IMAGE_NAME}:${TAG}"
+        
+        # Sign with latest tag if this is a release
+        if [[ "${{ github.ref_type }}" == "tag" ]]; then
+          cosign sign --yes "${IMAGE_NAME}:latest"
+        fi
+
+    - name: Verify signature
+      env:
+        COSIGN_EXPERIMENTAL: 1
+      run: |
+        IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+        TAG="${{ github.ref_name }}"
+        
+        # Verify the signature
+        cosign verify "${IMAGE_NAME}:${TAG}"
+
+  update-readme:
+    name: Update Documentation
+    runs-on: ubuntu-latest
+    needs: [build-and-push, test-image]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update Docker usage in README
+      run: |
+        # Extract image details
+        IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+        DIGEST="${{ needs.build-and-push.outputs.image-digest }}"
+        
+        # Create or update README section with Docker information
+        cat >> DOCKER_USAGE.md << EOF
+        # Docker Usage
+        
+        ## Pull the latest image
+        \`\`\`bash
+        docker pull ${IMAGE_NAME}:latest
+        \`\`\`
+        
+        ## Run with default settings
+        \`\`\`bash
+        docker run -d \\
+          --name github-action-handler \\
+          -p 8000:8000 \\
+          -e GITHUB_WEBHOOK_SECRET=your_secret_here \\
+          -e GITHUB_TOKEN=your_token_here \\
+          ${IMAGE_NAME}:latest
+        \`\`\`
+        
+        ## Development mode
+        \`\`\`bash
+        docker run -d \\
+          --name github-action-handler-dev \\
+          -p 8000:8000 \\
+          -e DEBUG=true \\
+          -e WEBHOOK_SIGNATURE_REQUIRED=false \\
+          ${IMAGE_NAME}:dev
+        \`\`\`
+        
+        ## Image Details
+        - **Registry**: ${REGISTRY}
+        - **Repository**: ${IMAGE_NAME}
+        - **Latest Digest**: ${DIGEST}
+        - **Updated**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        EOF
+
+    - name: Commit documentation updates
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        if [[ -n "$(git status --porcelain)" ]]; then
+          git add DOCKER_USAGE.md
+          git commit -m "docs: Update Docker usage documentation [skip ci]"
+          git push
+        fi
+
+  cleanup:
+    name: Cleanup Old Images
+    runs-on: ubuntu-latest
+    needs: [build-and-push, test-image]
+    if: github.event_name != 'pull_request' && always()
+
+    steps:
+    - name: Delete old container images
+      uses: actions/delete-package-versions@v4
+      continue-on-error: true
+      with:
+        package-name: ${{ github.event.repository.name }}
+        package-type: 'container'
+        min-versions-to-keep: 10
+        delete-only-untagged-versions: true
+
+  summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [build-and-push, test-image, security-scan]
+    if: always()
+
+    steps:
+    - name: Generate build summary
+      run: |
+        echo "## 🐳 Docker Build Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Stage | Status | Details |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Build & Push | ${{ needs.build-and-push.result }} | Multi-arch build for production and development |" >> $GITHUB_STEP_SUMMARY
+        echo "| Image Testing | ${{ needs.test-image.result }} | Container startup and functionality tests |" >> $GITHUB_STEP_SUMMARY
+        echo "| Security Scan | ${{ needs.security-scan.result }} | Vulnerability scanning with Trivy |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+          echo "### 📦 Published Images" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Production**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Development**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev\`" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "- **Release**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Image Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Digest**: \`${{ needs.build-and-push.outputs.image-digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- **SBOM**: Generated and attached" >> $GITHUB_STEP_SUMMARY
+          echo "- **Provenance**: Generated and attached" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # Check for failures
+        if [[ "${{ needs.build-and-push.result }}" == "failure" ]] || \
+           [[ "${{ needs.test-image.result }}" == "failure" ]]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "❌ **Build pipeline failed - check logs for details**" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        else
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **All Docker build stages completed successfully**" >> $GITHUB_STEP_SUMMARY
+        fi 

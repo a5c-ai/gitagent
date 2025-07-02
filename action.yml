@@ -1,0 +1,332 @@
+name: 'GitHub Action Handler'
+description: 'Comprehensive GitHub Action event handler with commit history context for processing GitHub Action events'
+author: 'AI Development Team'
+
+branding:
+  icon: 'activity'
+  color: 'blue'
+
+inputs:
+  github-token:
+    description: 'GitHub personal access token for API access'
+    required: false
+    default: ${{ github.token }}
+  
+  log-level:
+    description: 'Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)'
+    required: false
+    default: 'INFO'
+  
+  log-format:
+    description: 'Log format (json, console)'
+    required: false
+    default: 'json'
+  
+  max-concurrent-events:
+    description: 'Maximum concurrent event processing'
+    required: false
+    default: '10'
+  
+  event-timeout:
+    description: 'Event processing timeout in seconds'
+    required: false
+    default: '30'
+  
+  background-tasks:
+    description: 'Enable background task processing'
+    required: false
+    default: 'true'
+  
+  metrics-enabled:
+    description: 'Enable metrics collection'
+    required: false
+    default: 'true'
+  
+  health-check-enabled:
+    description: 'Enable health check endpoints'
+    required: false
+    default: 'true'
+  
+  structured-logging:
+    description: 'Enable structured logging'
+    required: false
+    default: 'true'
+  
+  event-storage-enabled:
+    description: 'Enable event storage'
+    required: false
+    default: 'false'
+  
+  event-storage-path:
+    description: 'Path to store event data'
+    required: false
+    default: '/app/data/events'
+  
+  git-commit-history-count:
+    description: 'Number of commits to retrieve for history context'
+    required: false
+    default: '10'
+  
+  git-timeout:
+    description: 'Timeout for git operations in seconds'
+    required: false
+    default: '30'
+  
+  enabled-events:
+    description: 'Comma-separated list of enabled event types (empty means all events)'
+    required: false
+    default: ''
+  
+  disabled-events:
+    description: 'Comma-separated list of disabled event types'
+    required: false
+    default: ''
+  
+  development-mode:
+    description: 'Enable development mode (exposes API docs and detailed errors)'
+    required: false
+    default: 'false'
+
+outputs:
+  processing-result:
+    description: 'Result of the event processing'
+    value: ${{ steps.process-event.outputs.result }}
+  
+  commit-history:
+    description: 'Commit history context as JSON'
+    value: ${{ steps.process-event.outputs.commit-history }}
+  
+  github-context:
+    description: 'GitHub Action context as JSON'
+    value: ${{ steps.process-event.outputs.github-context }}
+  
+  success:
+    description: 'Whether the event processing was successful'
+    value: ${{ steps.process-event.outputs.success }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        # Validate log level
+        case "${{ inputs.log-level }}" in
+          DEBUG|INFO|WARNING|ERROR|CRITICAL)
+            echo "✅ Log level: ${{ inputs.log-level }}"
+            ;;
+          *)
+            echo "❌ Invalid log level: ${{ inputs.log-level }}. Must be DEBUG, INFO, WARNING, ERROR, or CRITICAL."
+            exit 1
+            ;;
+        esac
+        
+        # Validate log format
+        case "${{ inputs.log-format }}" in
+          json|console)
+            echo "✅ Log format: ${{ inputs.log-format }}"
+            ;;
+          *)
+            echo "❌ Invalid log format: ${{ inputs.log-format }}. Must be json or console."
+            exit 1
+            ;;
+        esac
+        
+        # Validate max concurrent events
+        if ! [[ "${{ inputs.max-concurrent-events }}" =~ ^[0-9]+$ ]] || [ "${{ inputs.max-concurrent-events }}" -lt 1 ]; then
+          echo "❌ Invalid max-concurrent-events: ${{ inputs.max-concurrent-events }}. Must be a positive integer."
+          exit 1
+        fi
+        
+        # Validate event timeout
+        if ! [[ "${{ inputs.event-timeout }}" =~ ^[0-9]+$ ]] || [ "${{ inputs.event-timeout }}" -lt 1 ]; then
+          echo "❌ Invalid event-timeout: ${{ inputs.event-timeout }}. Must be a positive integer."
+          exit 1
+        fi
+        
+        # Validate git commit history count
+        if ! [[ "${{ inputs.git-commit-history-count }}" =~ ^[0-9]+$ ]] || [ "${{ inputs.git-commit-history-count }}" -lt 1 ] || [ "${{ inputs.git-commit-history-count }}" -gt 100 ]; then
+          echo "❌ Invalid git-commit-history-count: ${{ inputs.git-commit-history-count }}. Must be between 1 and 100."
+          exit 1
+        fi
+        
+        echo "✅ All inputs validated successfully"
+
+    - name: Setup Python environment
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install GitHub Action Handler
+      shell: bash
+      run: |
+        echo "📦 Installing GitHub Action Handler..."
+        pip install --upgrade pip
+        pip install github-action-handler
+        echo "✅ GitHub Action Handler installed successfully"
+
+    - name: Prepare environment
+      shell: bash
+      run: |
+        # Create data directory if event storage is enabled
+        if [ "${{ inputs.event-storage-enabled }}" = "true" ]; then
+          mkdir -p "$(dirname "${{ inputs.event-storage-path }}")"
+        fi
+        
+        # Create logs directory
+        mkdir -p ./logs
+        
+        echo "✅ Environment prepared"
+
+    - name: Process GitHub Action Event
+      id: process-event
+      shell: bash
+      run: |
+        echo "🚀 Processing GitHub Action event..."
+        
+        # Set environment variables
+        export GITHUB_TOKEN="${{ inputs.github-token }}"
+        export LOG_LEVEL="${{ inputs.log-level }}"
+        export LOG_FORMAT="${{ inputs.log-format }}"
+        export MAX_CONCURRENT_EVENTS="${{ inputs.max-concurrent-events }}"
+        export EVENT_TIMEOUT_SECONDS="${{ inputs.event-timeout }}"
+        export BACKGROUND_TASKS="${{ inputs.background-tasks }}"
+        export METRICS_ENABLED="${{ inputs.metrics-enabled }}"
+        export HEALTH_CHECK_ENABLED="${{ inputs.health-check-enabled }}"
+        export STRUCTURED_LOGGING="${{ inputs.structured-logging }}"
+        export EVENT_STORAGE_ENABLED="${{ inputs.event-storage-enabled }}"
+        export EVENT_STORAGE_PATH="${{ inputs.event-storage-path }}"
+        export GIT_COMMIT_HISTORY_COUNT="${{ inputs.git-commit-history-count }}"
+        export GIT_TIMEOUT_SECONDS="${{ inputs.git-timeout }}"
+        export DEVELOPMENT_MODE="${{ inputs.development-mode }}"
+        
+        # Set optional environment variables
+        if [ -n "${{ inputs.enabled-events }}" ]; then
+          export ENABLED_EVENTS="${{ inputs.enabled-events }}"
+        fi
+        
+        if [ -n "${{ inputs.disabled-events }}" ]; then
+          export DISABLED_EVENTS="${{ inputs.disabled-events }}"
+        fi
+        
+        # Create processing script
+        cat > process_event.py << 'EOF'
+        import os
+        import json
+        import asyncio
+        from datetime import datetime, timezone
+        from github_action_handler.config import Settings
+        from github_action_handler.event_handler import GitHubActionEventProcessor
+        from github_action_handler.models import GitHubEvent
+        
+        async def main():
+            try:
+                # Initialize settings and processor
+                settings = Settings()
+                processor = GitHubActionEventProcessor(settings)
+                
+                # Create event from GitHub context
+                event_data = {}
+                if os.getenv('GITHUB_EVENT_PATH'):
+                    with open(os.getenv('GITHUB_EVENT_PATH'), 'r') as f:
+                        event_data = json.load(f)
+                
+                # Create GitHub event object
+                github_event = GitHubEvent(**event_data)
+                
+                # Process the event
+                result = await processor.process_event(github_event)
+                
+                # Output results
+                result_json = json.dumps({
+                    "success": result.success, 
+                    "message": result.message, 
+                    "processing_time": result.processing_time
+                })
+                print(f"result={result_json}")
+                
+                if result.commit_history:
+                    commit_history_json = json.dumps({
+                        "branch": result.commit_history.branch,
+                        "total_commits": result.commit_history.total_commits,
+                        "head_sha": result.commit_history.head_sha,
+                        "commits": [
+                            {
+                                "sha": commit.sha,
+                                "message": commit.message,
+                                "author_name": commit.author_name,
+                                "author_email": commit.author_email,
+                                "timestamp": commit.timestamp.isoformat()
+                            }
+                            for commit in result.commit_history.commits
+                        ]
+                    })
+                    print(f"commit-history={commit_history_json}")
+                
+                if result.github_context:
+                    github_context_json = json.dumps({
+                        "event_name": result.github_context.event_name,
+                        "workflow": result.github_context.workflow,
+                        "job": result.github_context.job,
+                        "repository": result.github_context.repository,
+                        "actor": result.github_context.actor,
+                        "ref": result.github_context.ref,
+                        "sha": result.github_context.sha
+                    })
+                    print(f"github-context={github_context_json}")
+                
+                print(f"success={'true' if result.success else 'false'}")
+                
+                # Log processing summary
+                print("✅ Event processed successfully:")
+                print(f"  - Event type: {result.event_type}")
+                print(f"  - Processing time: {result.processing_time:.3f}s")
+                print(f"  - Success: {result.success}")
+                if result.commit_history:
+                    print(f"  - Commits retrieved: {result.commit_history.total_commits}")
+                if result.error:
+                    print(f"  - Error: {result.error}")
+                
+            except Exception as e:
+                print(f"❌ Event processing failed: {str(e)}")
+                error_result = json.dumps({
+                    "success": False, 
+                    "message": f"Processing failed: {str(e)}", 
+                    "processing_time": 0.0
+                })
+                print(f"result={error_result}")
+                print("success=false")
+                exit(1)
+        
+        if __name__ == '__main__':
+            asyncio.run(main())
+        EOF
+        
+        # Run the processing script
+        python process_event.py | tee -a $GITHUB_OUTPUT
+        
+        echo "✅ GitHub Action event processed successfully"
+
+    - name: Display processing summary
+      shell: bash
+      run: |
+        echo "📊 GitHub Action Handler Processing Summary"
+        echo "==========================================="
+        echo "🎯 Event: ${{ github.event_name }}"
+        echo "📋 Repository: ${{ github.repository }}"
+        echo "👤 Actor: ${{ github.actor }}"
+        echo "🌿 Ref: ${{ github.ref }}"
+        echo "🔗 SHA: ${{ github.sha }}"
+        echo "📁 Workspace: ${{ github.workspace }}"
+        echo ""
+        echo "⚙️ Configuration:"
+        echo "  - Log Level: ${{ inputs.log-level }}"
+        echo "  - Log Format: ${{ inputs.log-format }}"
+        echo "  - Max Concurrent Events: ${{ inputs.max-concurrent-events }}"
+        echo "  - Event Timeout: ${{ inputs.event-timeout }}s"
+        echo "  - Background Tasks: ${{ inputs.background-tasks }}"
+        echo "  - Metrics: ${{ inputs.metrics-enabled }}"
+        echo "  - Event Storage: ${{ inputs.event-storage-enabled }}"
+        echo "  - Git Commit History: ${{ inputs.git-commit-history-count }} commits"
+        echo ""
+        echo "✅ GitHub Action Handler completed successfully!" 

@@ -1,0 +1,398 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.11"
+  
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install .[dev]
+        
+    - name: Run Black (Code Formatting)
+      run: black --check --diff src/ tests/
+      
+    - name: Run isort (Import Sorting)
+      run: isort --check-only --diff src/ tests/
+      
+    - name: Run Flake8 (Style Guide)
+      run: flake8 src/ tests/
+      
+    - name: Run MyPy (Type Checking)
+      run: mypy src/
+      
+    - name: Check for security issues with Bandit
+      run: |
+        pip install bandit[toml]
+        bandit -r src/ -f json -o bandit-report.json
+        
+    - name: Upload Bandit results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: bandit-results
+        path: bandit-report.json
+
+  test:
+    name: Run Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.11", "3.12"]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install .[test]
+        
+    - name: Run pytest
+      run: |
+        pytest tests/ \
+          --verbose \
+          --cov=src/github_action_handler \
+          --cov-report=xml \
+          --cov-report=term-missing \
+          --cov-report=html \
+          --junit-xml=pytest-results.xml
+          
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results-${{ matrix.os }}-py${{ matrix.python-version }}
+        path: |
+          pytest-results.xml
+          htmlcov/
+          coverage.xml
+
+  validate-config:
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install .
+        
+    - name: Validate default configuration
+      run: |
+        python -m github_action_handler.main --config-check
+        
+    - name: List supported events
+      run: |
+        python -m github_action_handler.main --list-events
+        
+    - name: Test help output
+      run: |
+        python -m github_action_handler.main --help
+
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Docker image (test stage)
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        target: testing
+        push: false
+        tags: github-action-handler:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Build Docker image (production)
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        target: final
+        push: false
+        tags: github-action-handler:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Test Docker container
+      run: |
+        docker run --rm -d \
+          --name test-container \
+          -p 8000:8000 \
+          -e DEBUG=true \
+          github-action-handler:latest
+          
+        # Wait for container to start
+        sleep 10
+        
+        # Test health endpoint
+        curl -f http://localhost:8000/health
+        
+        # Test API endpoints
+        curl -f http://localhost:8000/events/supported
+        
+        # Stop container
+        docker stop test-container
+
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Docker image for scanning
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        target: final
+        push: false
+        tags: github-action-handler:scan
+        cache-from: type=gha
+        
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'github-action-handler:scan'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+        
+    - name: Run Docker Scout (if available)
+      continue-on-error: true
+      run: |
+        if command -v docker &> /dev/null && docker scout version &> /dev/null; then
+          docker scout cves github-action-handler:scan
+        else
+          echo "Docker Scout not available, skipping..."
+        fi
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    
+    services:
+      github-action-handler:
+        image: github-action-handler:latest
+        ports:
+          - 8000:8000
+        env:
+          DEBUG: true
+          LOG_LEVEL: DEBUG
+          WEBHOOK_SIGNATURE_REQUIRED: false
+          
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install test dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install httpx pytest pytest-asyncio
+        
+    - name: Wait for service to be ready
+      run: |
+        timeout 60 bash -c 'until curl -f http://localhost:8000/health; do sleep 2; done'
+        
+    - name: Run integration tests
+      run: |
+        # Test health endpoints
+        curl -f http://localhost:8000/health
+        curl -f http://localhost:8000/health/detailed
+        
+        # Test API endpoints
+        curl -f http://localhost:8000/events/supported
+        curl -f http://localhost:8000/stats
+        curl -f http://localhost:8000/config
+        
+        # Test specific event structure
+        curl -f http://localhost:8000/events/structure/push
+        curl -f http://localhost:8000/events/structure/pull_request
+        
+        # Test metrics endpoint
+        curl -f http://localhost:8000/metrics
+        
+    - name: Test webhook endpoint (without signature)
+      run: |
+        # Create a test payload
+        cat > test_payload.json << 'EOF'
+        {
+          "action": "opened",
+          "sender": {
+            "id": 12345,
+            "login": "testuser",
+            "node_id": "test123",
+            "avatar_url": "https://github.com/images/error/testuser_happy.gif",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/testuser",
+            "html_url": "https://github.com/testuser",
+            "type": "User",
+            "site_admin": false
+          },
+          "repository": {
+            "id": 123456,
+            "node_id": "test456",
+            "name": "test-repo",
+            "full_name": "testuser/test-repo",
+            "private": false,
+            "owner": {
+              "id": 12345,
+              "login": "testuser",
+              "node_id": "test123",
+              "avatar_url": "https://github.com/images/error/testuser_happy.gif",
+              "type": "User",
+              "site_admin": false
+            },
+            "html_url": "https://github.com/testuser/test-repo",
+            "url": "https://api.github.com/repos/testuser/test-repo",
+            "created_at": "2023-01-01T00:00:00Z",
+            "updated_at": "2023-01-01T00:00:00Z",
+            "pushed_at": "2023-01-01T00:00:00Z",
+            "default_branch": "main"
+          }
+        }
+        EOF
+        
+        # Send test webhook
+        curl -X POST http://localhost:8000/webhook \
+          -H "Content-Type: application/json" \
+          -H "X-GitHub-Event: issues" \
+          -H "X-GitHub-Delivery: test-delivery-123" \
+          -d @test_payload.json \
+          --fail-with-body
+
+  publish-results:
+    name: Publish Test Results
+    runs-on: ubuntu-latest
+    needs: [lint, test, validate-config, integration-test]
+    if: always()
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      
+    - name: Publish test results
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      if: always()
+      with:
+        files: "**/pytest-results.xml"
+        
+    - name: Comment PR with test results
+      uses: marocchino/sticky-pull-request-comment@v2
+      if: github.event_name == 'pull_request' && always()
+      with:
+        header: test-results
+        message: |
+          ## 🧪 Test Results
+          
+          The CI pipeline has completed. Check the details in the workflow run.
+          
+          - **Linting**: ${{ needs.lint.result }}
+          - **Tests**: ${{ needs.test.result }}
+          - **Config Validation**: ${{ needs.validate-config.result }}
+          - **Docker Build**: ${{ needs.docker-build.result }}
+          - **Integration Tests**: ${{ needs.integration-test.result }}
+
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [lint, test, validate-config, docker-build, security-scan, integration-test]
+    if: always()
+    
+    steps:
+    - name: Check all jobs status
+      run: |
+        echo "## CI Pipeline Results" >> $GITHUB_STEP_SUMMARY
+        echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Code Quality & Linting | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Configuration Validation | ${{ needs.validate-config.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Docker Build | ${{ needs.docker-build.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Security Scanning | ${{ needs.security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Integration Tests | ${{ needs.integration-test.result }} |" >> $GITHUB_STEP_SUMMARY
+        
+        # Check if any critical jobs failed
+        if [[ "${{ needs.lint.result }}" == "failure" ]] || \
+           [[ "${{ needs.test.result }}" == "failure" ]] || \
+           [[ "${{ needs.docker-build.result }}" == "failure" ]]; then
+          echo "❌ CI pipeline failed - critical jobs have failed"
+          exit 1
+        else
+          echo "✅ CI pipeline completed successfully"
+        fi 
