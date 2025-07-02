@@ -86,6 +86,38 @@ inputs:
     description: 'Enable development mode (exposes API docs and detailed errors)'
     required: false
     default: 'false'
+  
+  # Agent Configuration
+  agents-enabled:
+    description: 'Enable AI agent processing'
+    required: false
+    default: 'true'
+  
+  agents-directory:
+    description: 'Directory containing agent configuration files'
+    required: false
+    default: '.github/action-handlers'
+  
+  # Agent CLI API Keys
+  claude-api-key:
+    description: 'Anthropic Claude API key'
+    required: false
+    default: ''
+  
+  gemini-api-key:
+    description: 'Google Gemini API key'
+    required: false
+    default: ''
+  
+  openai-api-key:
+    description: 'OpenAI API key (used for both OpenAI and Codex agents)'
+    required: false
+    default: ''
+  
+  anthropic-api-key:
+    description: 'Alternative Anthropic API key'
+    required: false
+    default: ''
 
 outputs:
   processing-result:
@@ -103,6 +135,22 @@ outputs:
   success:
     description: 'Whether the event processing was successful'
     value: ${{ steps.process-event.outputs.success }}
+  
+  agents-discovered:
+    description: 'Number of agents discovered for the event'
+    value: ${{ steps.process-event.outputs.agents-discovered }}
+  
+  agents-executed:
+    description: 'Number of agents that were executed'
+    value: ${{ steps.process-event.outputs.agents-executed }}
+  
+  agent-results:
+    description: 'Results from agent executions as JSON'
+    value: ${{ steps.process-event.outputs.agent-results }}
+  
+  artifacts-created:
+    description: 'List of artifacts created by agents'
+    value: ${{ steps.process-event.outputs.artifacts-created }}
 
 runs:
   using: 'composite'
@@ -199,6 +247,27 @@ runs:
         export GIT_COMMIT_HISTORY_COUNT="${{ inputs.git-commit-history-count }}"
         export GIT_TIMEOUT_SECONDS="${{ inputs.git-timeout }}"
         export DEVELOPMENT_MODE="${{ inputs.development-mode }}"
+        
+        # Agent configuration
+        export AGENTS_ENABLED="${{ inputs.agents-enabled }}"
+        export AGENTS_DIRECTORY="${{ inputs.agents-directory }}"
+        
+        # Agent API keys (only set if provided)
+        if [ -n "${{ inputs.claude-api-key }}" ]; then
+          export CLAUDE_API_KEY="${{ inputs.claude-api-key }}"
+        fi
+        
+        if [ -n "${{ inputs.gemini-api-key }}" ]; then
+          export GEMINI_API_KEY="${{ inputs.gemini-api-key }}"
+        fi
+        
+        if [ -n "${{ inputs.openai-api-key }}" ]; then
+          export OPENAI_API_KEY="${{ inputs.openai-api-key }}"
+        fi
+        
+        if [ -n "${{ inputs.anthropic-api-key }}" ]; then
+          export ANTHROPIC_API_KEY="${{ inputs.anthropic-api-key }}"
+        fi
         
         # Set optional environment variables
         if [ -n "${{ inputs.enabled-events }}" ]; then

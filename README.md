@@ -9,76 +9,208 @@ A comprehensive GitHub Action for handling and processing all GitHub Action even
 ## 🚀 Features
 
 - **Complete Event Coverage**: Handles all 60+ GitHub Action event types (workflows, issues, PRs, security events, etc.)
-- **Docker-based**: Runs as a containerized service with multi-architecture support
+- **AI Agent Integration**: Dynamic AI agent discovery and execution with support for multiple AI providers
+- **Agent CLI Support**: Integrated support for Codex, Gemini, Claude, and OpenAI CLIs
+- **Dynamic Configuration**: YAML-based agent definitions with hierarchical organization by event type
+- **Template System**: Jinja2 template support for dynamic prompts with event context
+- **Commit History Context**: Automatically includes recent commit history in agent prompts
+- **MCP Server Support**: Model Context Protocol integration for enhanced agent capabilities
+- **Flexible Output**: Multiple output destinations (console, files, artifacts, comments)
 - **Production Ready**: Comprehensive logging, monitoring, health checks, and error handling
-- **Security First**: Webhook signature verification, rate limiting, and security event detection
+- **Security First**: Secure agent execution with environment variable protection
 - **Highly Configurable**: Extensive configuration options for all aspects of event processing
-- **Notification Support**: Built-in Slack and Discord webhook integrations
-- **Metrics & Monitoring**: Prometheus metrics, health checks, and detailed statistics
-- **Event Storage**: Optional persistent event storage and analysis
-- **Background Processing**: Concurrent event processing with timeout protection
+- **CLI Management**: Complete CLI for agent discovery, testing, and validation
 
 ## 📦 Quick Start
 
 ### Basic Usage
 
 ```yaml
-name: GitHub Event Handler
+name: GitHub Event Handler with AI Agents
 on: [push, pull_request, issues]
 
 jobs:
   handle-events:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
       - name: Handle GitHub Events
         uses: tmusk/github-actions@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          webhook-secret: ${{ secrets.WEBHOOK_SECRET }}
           log-level: INFO
+          # Agent CLI Configuration
+          claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
+          gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          agents-enabled: true
+```
+
+## 🤖 AI Agent System
+
+The GitHub Action Handler supports a powerful AI agent system that allows you to create custom AI-powered responses to GitHub events. Agents are defined using YAML configuration files organized in a hierarchical structure.
+
+### Agent Directory Structure
+
+```
+.github/action-handlers/
+├── push/                    # Agents for push events
+│   ├── claude-reviewer.yml
+│   ├── codex-analyzer.yml
+│   └── security-scanner.yml
+├── pull_request/           # Agents for PR events
+│   ├── gemini-analyzer.yml
+│   └── claude-merger.yml
+├── issues/                 # Agents for issue events
+│   └── support-bot.yml
+├── security_advisory/      # Agents for security events
+│   └── alert-handler.yml
+└── all/                   # Agents that run on all events
+    └── logger.yml
+```
+
+### Agent Configuration
+
+Each agent is defined in a YAML file with the following structure:
+
+```yaml
+agent:
+  type: "claude"  # Agent type: codex, gemini, claude, custom
+  name: "code-reviewer"
+  description: "Automated code reviewer"
+  version: "1.0.0"
+
+configuration:
+  model: "claude-3-sonnet-20241022"
+  max_tokens: 4000
+  temperature: 0.1
+
+triggers:
+  branches: ["main", "develop"]  # Branch patterns (glob)
+  tags: ["v*"]                   # Tag patterns (glob)
+  paths: ["*.py", "*.js"]        # File patterns (glob)
+  event_actions: ["opened"]      # Specific event actions
+  conditions:                    # Jinja2 template conditions
+    - "{{ event.pull_request.draft == false }}"
+    - "{{ commit_history.total_commits > 0 }}"
+
+prompt_template: |
+  You are reviewing code changes in {{ github_context.repository }}.
+  
+  ## Changes
+  {% for commit in commit_history.commits[:5] %}
+  - {{ commit.message }} ({{ commit.author_name }})
+  {% endfor %}
+  
+  Please provide a detailed review focusing on:
+  1. Code quality and best practices
+  2. Security vulnerabilities
+  3. Performance considerations
+
+mcp_servers:
+  - name: "github-server"
+    url: "github://api"
+    config:
+      token: "${GITHUB_TOKEN}"
+    enabled: true
+
+output:
+  format: "markdown"
+  destination: "artifact"  # console, file, artifact, comment, pr_review
+  file_path: "review-{{ github_context.sha[:8] }}.md"
+  max_length: 5000
+
+enabled: true
+priority: 10  # Lower = higher priority
+```
+
+### Supported Agent Types
+
+- **Codex**: OpenAI models including Codex (requires `OPENAI_API_KEY`)
+- **Gemini**: Google's Gemini AI (requires `GEMINI_API_KEY`)
+- **Claude**: Anthropic's Claude AI (requires `CLAUDE_API_KEY`)
+- **Custom**: Custom CLI implementation
+
+### Template Variables
+
+Agent prompts have access to rich context through Jinja2 templates:
+
+- `{{ event }}` - Complete GitHub event data
+- `{{ github_context }}` - GitHub Action context (repository, ref, actor, etc.)
+- `{{ commit_history }}` - Recent commit history with messages and authors
+- `{{ agent }}` - Agent configuration and metadata
+- `{{ config }}` - Agent-specific configuration
+
+### Output Destinations
+
+- **console**: Print to workflow logs
+- **file**: Write to specified file path
+- **artifact**: Create GitHub Actions artifact
+- **comment**: Post as issue/PR comment (requires GitHub API)
+- **pr_review**: Submit as PR review (requires GitHub API)
+
+### CLI Management
+
+The system includes comprehensive CLI commands for agent management:
+
+```bash
+# List all discovered agents
+python -m github_action_handler agents list
+
+# Test a specific agent configuration
+python -m github_action_handler agents test .github/action-handlers/push/claude-reviewer.yml
+
+# Validate all agent configurations
+python -m github_action_handler agents validate
+
+# Show agent statistics
+python -m github_action_handler agents stats
 ```
 
 ### Advanced Configuration
 
 ```yaml
-name: Advanced Event Handler
-on: [workflow_run, deployment, security_advisory]
+name: Advanced Event Handler with AI Agents
+on: [workflow_run, deployment, security_advisory, push, pull_request]
 
 jobs:
   advanced-handler:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
       - name: Advanced Event Handler
         uses: tmusk/github-actions@v1
         with:
           # Authentication
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          webhook-secret: ${{ secrets.WEBHOOK_SECRET }}
-          
-          # Server Configuration
-          port: 8080
-          log-level: DEBUG
-          log-format: json
           
           # Processing Configuration
+          log-level: DEBUG
+          log-format: json
           max-concurrent-events: 20
           event-timeout: 60
-          webhook-signature-required: true
+          commit-history-count: 15
+          
+          # Agent Configuration
+          agents-enabled: true
+          agents-directory: ".github/action-handlers"
+          
+          # Agent CLI Configurations
+          claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
+          gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          
+          # Event Filtering
+          enabled-events: "push,pull_request,workflow_run,deployment,security_advisory"
           
           # Features
-          rate-limit-enabled: true
-          rate-limit-requests: 200
           metrics-enabled: true
           background-tasks: true
           event-storage-enabled: true
-          
-          # Event Filtering
-          enabled-events: "workflow_run,deployment,security_advisory"
-          notification-events: "security_advisory,vulnerability_alert"
-          
-          # Notifications
-          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          discord-webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
 ```
 
 ## 🔧 Configuration Options
@@ -88,34 +220,38 @@ jobs:
 | Input | Description | Default | Required |
 |-------|-------------|---------|----------|
 | `github-token` | GitHub personal access token | `${{ github.token }}` | No |
-| `webhook-secret` | GitHub webhook secret for signature verification | `''` | No |
-| `webhook-signature-required` | Require webhook signature verification | `true` | No |
-
-### Server Configuration
-
-| Input | Description | Default | Required |
-|-------|-------------|---------|----------|
-| `port` | Port to run the handler on | `8000` | No |
-| `log-level` | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) | `INFO` | No |
-| `log-format` | Log format (json, console) | `json` | No |
 
 ### Processing Configuration
 
 | Input | Description | Default | Required |
 |-------|-------------|---------|----------|
+| `log-level` | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) | `INFO` | No |
+| `log-format` | Log format (json, console) | `json` | No |
 | `max-concurrent-events` | Maximum concurrent event processing | `10` | No |
 | `event-timeout` | Event processing timeout in seconds | `30` | No |
 | `background-tasks` | Enable background task processing | `true` | No |
+| `commit-history-count` | Number of commits to include in history context | `10` | No |
+
+### Agent Configuration
+
+| Input | Description | Default | Required |
+|-------|-------------|---------|----------|
+| `agents-enabled` | Enable AI agent processing | `true` | No |
+| `agents-directory` | Directory containing agent configurations | `.github/action-handlers` | No |
+| `claude-api-key` | Anthropic Claude API key | `''` | No |
+| `gemini-api-key` | Google Gemini API key | `''` | No |
+| `openai-api-key` | OpenAI API key (used for Codex agents) | `''` | No |
+| `anthropic-api-key` | Alternative Anthropic API key | `''` | No |
 
 ### Feature Toggles
 
 | Input | Description | Default | Required |
 |-------|-------------|---------|----------|
-| `rate-limit-enabled` | Enable rate limiting | `true` | No |
-| `rate-limit-requests` | Rate limit requests per minute | `100` | No |
 | `metrics-enabled` | Enable metrics collection | `true` | No |
 | `health-check-enabled` | Enable health check endpoints | `true` | No |
 | `structured-logging` | Enable structured logging | `true` | No |
+| `event-storage-enabled` | Enable event storage | `false` | No |
+| `event-storage-path` | Path to store event data | `/tmp/events` | No |
 
 ### Event Configuration
 
@@ -123,24 +259,16 @@ jobs:
 |-------|-------------|---------|----------|
 | `enabled-events` | Comma-separated list of enabled event types | `''` (all) | No |
 | `disabled-events` | Comma-separated list of disabled event types | `''` | No |
-| `event-storage-enabled` | Enable event storage | `false` | No |
-| `event-storage-path` | Path to store event data | `/app/data/events` | No |
-
-### Notifications
-
-| Input | Description | Default | Required |
-|-------|-------------|---------|----------|
-| `slack-webhook-url` | Slack webhook URL for notifications | `''` | No |
-| `discord-webhook-url` | Discord webhook URL for notifications | `''` | No |
-| `notification-events` | Events that trigger notifications | `security_advisory,vulnerability_alert` | No |
 
 ## 📤 Outputs
 
 | Output | Description |
 |--------|-------------|
-| `container-url` | URL of the running container |
-| `container-id` | ID of the running container |
-| `health-status` | Health status of the handler |
+| `processing-result` | JSON result of event processing including agent execution results |
+| `agents-discovered` | Number of agents discovered for the event |
+| `agents-executed` | Number of agents that were executed |
+| `commit-history` | JSON object containing commit history context |
+| `artifacts-created` | List of artifacts created by agents |
 
 ## 🎯 Supported Events
 

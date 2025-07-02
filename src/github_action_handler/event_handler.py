@@ -24,6 +24,7 @@ from .models import (
     GitHubCommit,
     GitHubActionContext,
 )
+from .agent_manager import agent_manager
 
 logger = structlog.get_logger(__name__)
 
@@ -44,7 +45,7 @@ class BaseEventHandler:
         self.logger = structlog.get_logger(self.__class__.__name__)
     
     async def handle(self, event: GitHubEvent, context: GitHubActionContext) -> EventProcessingResult:
-        """Handle a GitHub event. Override this method in subclasses."""
+        """Handle a GitHub event with agent integration."""
         start_time = time.time()
         
         try:
@@ -53,6 +54,47 @@ class BaseEventHandler:
             
             # Process the event (stub implementation)
             result = await self._process_event(event, context, commit_history)
+            
+            # Discover and execute agents for this event
+            agent_results = []
+            agents_discovered = 0
+            agents_executed = 0
+            
+            if self.settings.agents_enabled:
+                try:
+                    # Discover agents for this event type
+                    agents = await agent_manager.discover_agents(
+                        context.event_name,
+                        context.workspace
+                    )
+                    agents_discovered = len(agents)
+                    
+                    # Filter agents based on trigger conditions
+                    filtered_agents = await agent_manager.filter_agents(
+                        agents, event, context, commit_history
+                    )
+                    agents_executed = len(filtered_agents)
+                    
+                    # Execute filtered agents
+                    if filtered_agents:
+                        agent_results = await agent_manager.execute_agents(
+                            filtered_agents, event, context, commit_history
+                        )
+                        
+                        self.logger.info(
+                            "Agents executed",
+                            event_type=context.event_name,
+                            agents_discovered=agents_discovered,
+                            agents_executed=agents_executed,
+                            successful_agents=sum(1 for r in agent_results if r.success)
+                        )
+                    
+                except Exception as e:
+                    self.logger.error(
+                        "Agent execution failed",
+                        event_type=context.event_name,
+                        error=str(e)
+                    )
             
             processing_time = time.time() - start_time
             
@@ -63,6 +105,9 @@ class BaseEventHandler:
                 message=f"Successfully processed {context.event_name} event",
                 commit_history=commit_history,
                 github_context=context,
+                agent_results=agent_results,
+                agents_discovered=agents_discovered,
+                agents_executed=agents_executed,
                 metadata=result
             )
             
@@ -497,4 +542,8 @@ class GitHubActionEventProcessor:
         elif event_type in ["team", "member", "organization"]:
             return "collaboration"
         else:
-            return "other" 
+            return "other"
+
+
+# Global event handler instance
+event_handler = GitHubActionEventProcessor(Settings()) 

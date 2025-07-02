@@ -85,6 +85,86 @@ class GitHubActionTrigger(str, Enum):
     PACKAGE = "package"
 
 
+class AgentType(str, Enum):
+    """Enumeration of supported AI agent types."""
+    
+    CODEX = "codex"
+    GEMINI = "gemini"
+    CLAUDE = "claude"
+    CUSTOM = "custom"
+
+
+class OutputDestination(str, Enum):
+    """Enumeration of output destinations for agent responses."""
+    
+    COMMENT = "comment"
+    PR_REVIEW = "pr_review"
+    FILE = "file"
+    ISSUE = "issue"
+    CONSOLE = "console"
+    ARTIFACT = "artifact"
+
+
+class AgentCliConfiguration(BaseModel):
+    """Configuration for AI agent CLI tools."""
+    
+    executable_path: str = Field(..., description="Path to the agent CLI executable")
+    api_key_env: Optional[str] = Field(None, description="Environment variable containing API key")
+    api_key: Optional[str] = Field(None, description="Direct API key (not recommended)")
+    base_url: Optional[str] = Field(None, description="Custom API base URL")
+    model: Optional[str] = Field(None, description="Default model to use")
+    max_tokens: Optional[int] = Field(None, description="Maximum tokens for responses")
+    temperature: Optional[float] = Field(None, description="Temperature for response generation")
+    timeout_seconds: int = Field(default=300, description="Timeout for CLI execution")
+    additional_args: List[str] = Field(default_factory=list, description="Additional CLI arguments")
+    environment_vars: Dict[str, str] = Field(default_factory=dict, description="Additional environment variables")
+
+
+class McpServerConfig(BaseModel):
+    """Configuration for MCP (Model Context Protocol) servers."""
+    
+    name: str = Field(..., description="Server name")
+    url: str = Field(..., description="Server URL or protocol")
+    config: Dict[str, Any] = Field(default_factory=dict, description="Server-specific configuration")
+    enabled: bool = Field(default=True, description="Whether the server is enabled")
+    timeout_seconds: int = Field(default=30, description="Timeout for server connections")
+
+
+class AgentTriggerCondition(BaseModel):
+    """Trigger conditions for when an agent should run."""
+    
+    branches: Optional[List[str]] = Field(None, description="Branch patterns (glob)")
+    tags: Optional[List[str]] = Field(None, description="Tag patterns (glob)")
+    paths: Optional[List[str]] = Field(None, description="File path patterns (glob)")
+    conditions: Optional[List[str]] = Field(None, description="Jinja2 template conditions")
+    event_actions: Optional[List[str]] = Field(None, description="Specific event actions")
+    files_changed_min: Optional[int] = Field(None, description="Minimum files changed")
+    files_changed_max: Optional[int] = Field(None, description="Maximum files changed")
+
+
+class AgentOutputConfig(BaseModel):
+    """Configuration for agent output handling."""
+    
+    format: str = Field(default="markdown", description="Output format")
+    destination: OutputDestination = Field(default=OutputDestination.CONSOLE, description="Where to send output")
+    file_path: Optional[str] = Field(None, description="File path for file destination")
+    max_length: Optional[int] = Field(None, description="Maximum output length")
+    template: Optional[str] = Field(None, description="Output template")
+
+
+class AgentDefinition(BaseModel):
+    """Definition of an AI agent for handling events."""
+    
+    agent: Dict[str, Any] = Field(..., description="Agent metadata")
+    configuration: Dict[str, Any] = Field(default_factory=dict, description="Agent configuration")
+    triggers: AgentTriggerCondition = Field(default_factory=AgentTriggerCondition, description="When to run this agent")
+    prompt_template: str = Field(..., description="Jinja2 template for the agent prompt")
+    mcp_servers: List[McpServerConfig] = Field(default_factory=list, description="MCP servers for this agent")
+    output: AgentOutputConfig = Field(default_factory=AgentOutputConfig, description="Output configuration")
+    enabled: bool = Field(default=True, description="Whether the agent is enabled")
+    priority: int = Field(default=100, description="Execution priority (lower = higher priority)")
+
+
 class GitHubCommit(BaseModel):
     """Model for Git commit information."""
     
@@ -256,6 +336,19 @@ class GitHubActionContext(BaseModel):
     graphql_url: str = Field(..., description="GitHub GraphQL URL")
 
 
+class AgentExecutionResult(BaseModel):
+    """Result of executing an AI agent."""
+    
+    agent_name: str = Field(..., description="Name of the executed agent")
+    agent_type: AgentType = Field(..., description="Type of agent")
+    success: bool = Field(..., description="Whether execution was successful")
+    output: str = Field(default="", description="Agent output")
+    error: Optional[str] = Field(None, description="Error message if execution failed")
+    execution_time: float = Field(..., description="Execution time in seconds")
+    output_destination: OutputDestination = Field(..., description="Where output was sent")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+
+
 class GitHubEvent(BaseModel):
     """Base model for GitHub events with flexible field support."""
     
@@ -291,6 +384,9 @@ class EventProcessingResult(BaseModel):
     message: str = Field(..., description="Processing result message")
     commit_history: Optional[CommitHistory] = Field(None, description="Commit history context")
     github_context: Optional[GitHubActionContext] = Field(None, description="GitHub Action context")
+    agent_results: List[AgentExecutionResult] = Field(default_factory=list, description="Results from executed agents")
+    agents_discovered: int = Field(default=0, description="Number of agents discovered")
+    agents_executed: int = Field(default=0, description="Number of agents executed")
     error: Optional[str] = Field(None, description="Error message if processing failed")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
@@ -309,6 +405,7 @@ class DetailedHealthCheck(HealthCheck):
     system: Dict[str, Any] = Field(default_factory=dict, description="System metrics")
     application: Dict[str, Any] = Field(default_factory=dict, description="Application metrics")
     github_api: Dict[str, Any] = Field(default_factory=dict, description="GitHub API status")
+    agents: Dict[str, Any] = Field(default_factory=dict, description="Agent CLI status")
 
 
 class EventStatistics(BaseModel):
@@ -320,6 +417,7 @@ class EventStatistics(BaseModel):
     events_per_second: float = Field(0.0, description="Average events processed per second")
     processing_times: Dict[str, float] = Field(default_factory=dict, description="Processing time statistics")
     event_types: Dict[str, int] = Field(default_factory=dict, description="Event type counts")
+    agent_statistics: Dict[str, Any] = Field(default_factory=dict, description="Agent execution statistics")
     last_processed: Optional[datetime] = Field(None, description="Last event processing timestamp")
     uptime: Optional[str] = Field(None, description="Service uptime")
 
@@ -336,4 +434,7 @@ class ConfigurationInfo(BaseModel):
     health_check_enabled: bool = Field(..., description="Health checks enabled")
     event_storage_enabled: bool = Field(..., description="Event storage enabled")
     enabled_events: Optional[List[str]] = Field(None, description="Enabled event types")
-    disabled_events: Optional[List[str]] = Field(None, description="Disabled event types") 
+    disabled_events: Optional[List[str]] = Field(None, description="Disabled event types")
+    agents_directory: str = Field(..., description="Agents configuration directory")
+    configured_agents: Dict[str, int] = Field(default_factory=dict, description="Number of configured agents by type")
+    agent_clis: Dict[str, bool] = Field(default_factory=dict, description="Available agent CLIs") 

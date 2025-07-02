@@ -1,0 +1,91 @@
+agent:
+  type: "gemini"
+  name: "pr-analyzer"
+  description: "Pull request analyzer using Gemini AI to assess PR quality and suggest improvements"
+  version: "1.0.0"
+
+configuration:
+  model: "gemini-pro"
+  max_tokens: 2048
+  temperature: 0.2
+
+triggers:
+  branches: ["main", "develop"]
+  event_actions: ["opened", "synchronize", "reopened"]
+  conditions:
+    - "{{ event.pull_request.draft == false }}"
+    - "{{ event.pull_request.changed_files <= 20 }}"
+  files_changed_min: 1
+
+prompt_template: |
+  # Pull Request Analysis
+  
+  ## PR Information
+  - **Title**: {{ event.pull_request.title }}
+  - **Number**: #{{ event.pull_request.number }}
+  - **Author**: {{ event.pull_request.user.login }}
+  - **Base Branch**: {{ event.pull_request.base.ref }}
+  - **Head Branch**: {{ event.pull_request.head.ref }}
+  - **State**: {{ event.pull_request.state }}
+  
+  {% if event.pull_request.body %}
+  ## PR Description
+  {{ event.pull_request.body }}
+  {% endif %}
+  
+  ## Repository Context
+  - **Repository**: {{ github_context.repository }}
+  - **Files Changed**: {{ event.pull_request.changed_files | default(0) }}
+  - **Commits**: {{ event.pull_request.commits | default(0) }}
+  - **Additions**: {{ event.pull_request.additions | default(0) }}
+  - **Deletions**: {{ event.pull_request.deletions | default(0) }}
+  
+  {% if commit_history %}
+  ## Recent Activity
+  **Recent commits on base branch**:
+  {% for commit in commit_history.commits[:3] %}
+  - `{{ commit.sha[:8] }}`: {{ commit.message }} ({{ commit.author_name }})
+  {% endfor %}
+  {% endif %}
+  
+  ## Analysis Request
+  Please analyze this pull request and provide:
+  
+  1. **PR Quality Assessment**
+     - Title and description clarity
+     - Scope and focus appropriateness
+     - Change size and complexity
+  
+  2. **Technical Review**
+     - Code organization and structure
+     - Potential conflicts or issues
+     - Testing considerations
+  
+  3. **Process Recommendations**
+     - Review suggestions
+     - Merge readiness
+     - Additional steps needed
+  
+  4. **Risk Assessment**
+     - Breaking change potential
+     - Performance impact
+     - Security considerations
+  
+  Please be concise but thorough in your analysis.
+
+mcp_servers:
+  - name: "github-pr-server"
+    url: "github://pulls"
+    config:
+      token: "${GITHUB_TOKEN}"
+      repository: "{{ github_context.repository }}"
+      pull_number: "{{ event.pull_request.number }}"
+    enabled: true
+
+output:
+  format: "markdown"
+  destination: "console"
+  max_length: 3000
+
+enabled: true
+priority: 20 
