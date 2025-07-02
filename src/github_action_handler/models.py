@@ -446,8 +446,7 @@ class GitHubEvent(BaseModel):
     after: Optional[str] = Field(None, description="After commit SHA")
     
     # Allow additional fields
-    class Config:
-        extra = "allow"
+    model_config = {"extra": "allow"}
 
 
 class EventProcessingResult(BaseModel):
