@@ -1,8 +1,6 @@
 # gitagent: GitHub Action that executes [PromptOps](ARTICLE.md) agents from the prompts in your repo
 
-[![CI](https://github.com/a5c-ai/gitagent/actions/workflows/ci.yml/badge.svg)](https://github.com/a5c-ai/gitagent/actions/workflows/ci.yml)
 [![Docker Publish](https://github.com/a5c-ai/gitagent/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/a5c-ai/gitagent/actions/workflows/docker-publish.yml)
-[![Security Scan](https://github.com/a5c-ai/gitagent/actions/workflows/security-scan.yml/badge.svg)](https://github.com/a5c-ai/gitagent/actions/workflows/security-scan.yml)
 
 gitagent is an intelligent orchestration system for GitHub Actions that seamlessly processes events and triggers AI-powered responses. This advanced platform provides multi-model AI integration, dynamic file handling, and comprehensive GitHub automation with **pre-installed CLI tools for OpenAI Codex, Claude, and Gemini** - no setup required!
 
