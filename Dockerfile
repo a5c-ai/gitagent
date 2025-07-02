@@ -34,9 +34,9 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # Install AI CLI tools
 RUN npm i -g @openai/codex@native
 
-RUN npm install -g @anthropic-ai/claude-code
+RUN npm i -g @anthropic-ai/claude-code
 
-RUN npm install -g @google/gemini-cli
+RUN npm i -g @google/gemini-cli
 
 # Create CLI tools directory and set up symlinks for easier access
 RUN mkdir -p /opt/cli-tools/bin && \
@@ -63,7 +63,7 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     tini \
     curl \
-    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && apt-get upgrade -y \
     && rm -rf /var/lib/apt/lists/* \
@@ -73,15 +73,18 @@ RUN apt-get update && apt-get install -y \
 RUN groupadd -r gitagent && \
     useradd -r -g gitagent -d /app -s /bin/bash -c "gitagent" gitagent
 
+RUN npm i -g @openai/codex@native
+
+RUN npm i -g @anthropic-ai/claude-code
+
+RUN npm i -g @google/gemini-cli
+
 # Set working directory
 WORKDIR /app
 
 # Copy virtual environment from builder stage
 COPY --from=builder /opt/venv /opt/venv
 
-# Copy CLI tools from builder stage
-COPY --from=builder /opt/cli-tools /opt/cli-tools
-COPY --from=builder /usr/lib/node_modules/@openai/codex /usr/lib/node_modules/@openai/codex
 
 # Copy application source
 COPY --from=builder /app/build/src ./src
