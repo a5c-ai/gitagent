@@ -200,4 +200,4 @@ RUN python3 -c "import gitagent; print('gitagent and dependencies installed succ
     gemini --help && echo "Gemini CLI installed successfully"
 
 # Default command
-# CMD ["python3", "-m", "gitagent.main"] 
+CMD ["python3", "-m", "gitagent.main"] 
