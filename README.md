@@ -1,4 +1,4 @@
-# gitagent: GitHub Action that executes [PromptOps](ARTICLE.md) agents from the prompts in your repo
+# gitagent: GitHub Action that executes [AI-GitOps](ARTICLE.md) agents from the prompts in your repo
 
 [![Docker Publish](https://github.com/a5c-ai/gitagent/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/a5c-ai/gitagent/actions/workflows/docker-publish.yml)
 

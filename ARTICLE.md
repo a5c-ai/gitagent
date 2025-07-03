@@ -1,4 +1,4 @@
-# PromptOps - GitOps for AI: Managing Development Prompts as Part of Your Codebase
+# AI-GitOps - GitOps for AI Development Agents: Managing Development Prompts as Part of Your Codebase
 
 ## Overview – The Idea in Simple Terms
 
