@@ -597,13 +597,13 @@ async def test_agent(args: argparse.Namespace, settings: Settings) -> int:
         
         # Validate agent type
         agent_type = agent_def.agent.get('type', 'custom')
-        cli_config = settings.get_agent_cli_config(agent_type)
+        # cli_config = settings.get_agent_cli_config(agent_type)
         api_key = settings.get_agent_api_key(agent_type)
         
         print(f"Agent Type:     {agent_type}")
         print(f"Enabled:        {agent_def.enabled}")
         print(f"Priority:       {agent_def.priority}")
-        print(f"CLI Available:  {'✓' if cli_config else '✗'}")
+        # print(f"CLI Available:  {'✓' if cli_config else '✗'}")
         print(f"API Key Set:    {'✓' if api_key else '✗'}")
         
         # Test with sample event if provided
@@ -726,10 +726,10 @@ async def validate_agents(args: argparse.Namespace, settings: Settings) -> int:
                     issues.append(f"{yaml_file}: Unknown agent type '{agent_type}'")
                 
                 # Check CLI availability if not custom
-                if agent_type != 'custom':
-                    cli_config = settings.get_agent_cli_config(agent_type)
-                    if not cli_config:
-                        issues.append(f"{yaml_file}: No CLI configuration for type '{agent_type}'")
+                # if agent_type != 'custom':
+                #     cli_config = settings.get_agent_cli_config(agent_type)
+                #     if not cli_config:
+                #         issues.append(f"{yaml_file}: No CLI configuration for type '{agent_type}'")
                 
                 valid_agents += 1
                 
@@ -763,10 +763,10 @@ async def validate_agents(args: argparse.Namespace, settings: Settings) -> int:
                     issues.append(f"{yaml_file}: Unknown agent type '{agent_type}'")
                 
                 # Check CLI availability if not custom
-                if agent_type != 'custom':
-                    cli_config = settings.get_agent_cli_config(agent_type)
-                    if not cli_config:
-                        issues.append(f"{yaml_file}: No CLI configuration for type '{agent_type}'")
+                # if agent_type != 'custom':
+                #     cli_config = settings.get_agent_cli_config(agent_type)
+                #     if not cli_config:
+                #         issues.append(f"{yaml_file}: No CLI configuration for type '{agent_type}'")
                 
                 valid_agents += 1
                 

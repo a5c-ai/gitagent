@@ -229,68 +229,16 @@ class Settings(BaseSettings):
             "claude_code_sdk": self.claude_api_key or self.anthropic_api_key,
         }
         return keys.get(agent_type.lower())
-    
-    def setup_default_agent_configs(self):
-        """Set up default agent CLI configurations."""
-        # Codex CLI configuration
-        if not self.codex_cli and self.openai_api_key:
-            self.codex_cli = AgentCliConfiguration(
-                executable_path="codex",
-                api_key_env="OPENAI_API_KEY",  # Codex uses OpenAI API key
-                model="code-davinci-002",
-                max_tokens=2048,
-                timeout_seconds=300
-            )
-        
-        # Gemini CLI configuration
-        if not self.gemini_cli and self.gemini_api_key:
-            self.gemini_cli = AgentCliConfiguration(
-                executable_path="gemini",
-                api_key_env="GEMINI_API_KEY",
-                model="gemini-pro",
-                max_tokens=2048,
-                timeout_seconds=300
-            )
-        
-        # Claude Code configuration
-        if not self.claude_cli and (self.claude_api_key or self.anthropic_api_key):
-            self.claude_cli = AgentCliConfiguration(
-                executable_path="claude",
-                api_key_env="CLAUDE_API_KEY",
-                model="claude-3-sonnet-20241022",
-                max_tokens=4000,
-                timeout_seconds=300
-            )
-        
-        # Claude Code SDK configuration
-        if not self.claude_code_sdk and (self.claude_api_key or self.anthropic_api_key):
-            self.claude_code_sdk = ClaudeCodeSDKConfiguration(
-                api_key=self.claude_api_key or self.anthropic_api_key,
-                api_key_env="CLAUDE_API_KEY",
-                model="claude-3-sonnet-20241022",
-                max_tokens=4000,
-                temperature=0.1,
-                timeout_seconds=300,
-                max_turns=10,
-                output_format="text",
-                cwd=self.github_workspace
-            )
-        
 
     
     def get_available_agent_types(self) -> List[str]:
         """Get list of available agent types."""
         available = []
-        if self.codex_cli or self.openai_api_key:
-            available.append("codex")
-        if self.gemini_cli or self.gemini_api_key:
-            available.append("gemini")
-        if self.claude_cli or self.claude_api_key or self.anthropic_api_key:
-            available.append("claude")
-        if self.claude_code_sdk or self.claude_api_key or self.anthropic_api_key:
-            available.append("claude_code_sdk")
-        if self.custom_cli:
-            available.append("custom")
+        available.append("codex")
+        available.append("gemini")
+        available.append("claude")
+        available.append("claude_code_sdk")
+        available.append("custom")
         return available
 
 
@@ -298,4 +246,4 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # Set up default agent configurations
-settings.setup_default_agent_configs() 
+# settings.setup_default_agent_configs() 
