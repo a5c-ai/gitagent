@@ -3,7 +3,7 @@ description: 'GitHub Action that executes AI-GitOps agents from the prompts in y
 author: 'Tal Muskal'
 runs:
   using: 'docker'
-  image: 'ghcr.io/a5c-ai/gitagent:latest'
+  image: 'docker://ghcr.io/a5c-ai/gitagent:latest'
   args:
     - --github-token
     - ${{ inputs.github-token }}
