@@ -210,7 +210,28 @@ runs:
       run: |
         echo "📦 Installing gitagent..."
         pip install --upgrade pip
-        pip install gitagent
+        
+        # Install from the action's source directory
+        # When using 'uses: owner/repo@version', the action code is in $GITHUB_ACTION_PATH
+        if [ -n "$GITHUB_ACTION_PATH" ] && [ -f "$GITHUB_ACTION_PATH/pyproject.toml" ] && [ -d "$GITHUB_ACTION_PATH/src/gitagent" ]; then
+          echo "🔍 Installing from action source: $GITHUB_ACTION_PATH"
+          pip install -e "$GITHUB_ACTION_PATH"
+        elif [ -f "./pyproject.toml" ] && [ -d "./src/gitagent" ]; then
+          echo "🔍 Installing from current directory"
+          pip install -e .
+        else
+          echo "❌ Could not find gitagent source code"
+          echo "📍 Current directory: $(pwd)"
+          echo "📍 GITHUB_ACTION_PATH: ${GITHUB_ACTION_PATH:-'not set'}"
+          echo "📍 Contents of current directory:"
+          ls -la
+          if [ -n "$GITHUB_ACTION_PATH" ]; then
+            echo "📍 Contents of GITHUB_ACTION_PATH:"
+            ls -la "$GITHUB_ACTION_PATH"
+          fi
+          exit 1
+        fi
+        
         echo "✅ gitagent installed successfully"
 
     - name: Prepare environment
