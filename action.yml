@@ -1,5 +1,5 @@
 name: 'gitagent'
-description: 'Intelligent GitHub Action orchestration with AI-powered event processing and multi-model support'
+description: 'GitHub Action that executes AI-GitOps agents from the prompts in your repo'
 author: 'Tal Muskal'
 
 branding:
