@@ -757,7 +757,7 @@ jobs:
           log-format: json
           max-concurrent-events: 20
           event-timeout: 60
-          commit-history-count: 15
+          git-commit-history-count: 15
           
           # Agent Configuration
           agents-enabled: true
@@ -794,7 +794,7 @@ jobs:
 | `max-concurrent-events` | Maximum concurrent event processing | `10` | No |
 | `event-timeout` | Event processing timeout in seconds | `30` | No |
 | `background-tasks` | Enable background task processing | `true` | No |
-| `commit-history-count` | Number of commits to include in history context | `10` | No |
+| `git-commit-history-count` | Number of commits to include in history context | `10` | No |
 
 ### Agent Configuration
 

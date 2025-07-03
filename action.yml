@@ -8,10 +8,11 @@ runs:
     - python3
     - -m
     - gitagent.main
-    - --github-token
-    - ${{ inputs.github-token }}
     - --log-level
-    - ${{ inputs.log-level }}
+    - "${{ inputs.log-level }}"
+    - process
+    
+
   
 branding:
   icon: 'activity'
