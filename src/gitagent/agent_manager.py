@@ -625,39 +625,49 @@ class AgentManager:
     ) -> str:
         """Execute the agent CLI with the rendered prompt."""
         agent_type = agent.agent.get('type', 'custom')
-        cli_config = settings.get_agent_cli_config(agent_type)
-        
-        if not cli_config:
-            raise ValueError(f"No CLI configuration found for agent type: {agent_type}")
+        # cli_config = settings.get_agent_cli_config(agent_type)
+        env_vars = {
+            "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY", ""),
+            "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", ""),
+            "ANTHROPIC_API_KEY": os.getenv("ANTHROPIC_API_KEY", ""),
+        }
         
         # Prepare environment variables
         env = os.environ.copy()
-        env.update(cli_config.environment_vars)
-        
-        # Add API key if available
-        api_key = settings.get_agent_api_key(agent_type)
-        if api_key and cli_config.api_key_env:
-            env[cli_config.api_key_env] = api_key
-        
+        env.update(env_vars)
+        executable_path = os.getenv("EXECUTABLE_PATH", "")
+        # resolve the executable path according to the agent type
+        if agent_type == "claude":
+            executable_path = "claude"
+        elif agent_type == "gemini":
+            executable_path = "gemini"
+        elif agent_type == "codex":
+            executable_path = "codex"
+        additional_args = os.getenv("ADDITIONAL_ARGS", "")
+        model = os.getenv("MODEL", "")
+        max_tokens = os.getenv("MAX_TOKENS", "")
+        temperature = os.getenv("TEMPERATURE", "")
+        base_url = os.getenv("BASE_URL", "")
+        timeout_seconds = os.getenv("TIMEOUT_SECONDS", 900)
         # Build command arguments
-        cmd = [cli_config.executable_path]
-        cmd.extend(cli_config.additional_args)
+        cmd = [executable_path]
+        cmd.extend(additional_args)
         
         # Add model if specified
-        if cli_config.model:
-            cmd.extend(['--model', cli_config.model])
+        if model:
+            cmd.extend(['--model', model])
         
         # Add max tokens if specified
-        if cli_config.max_tokens:
-            cmd.extend(['--max-tokens', str(cli_config.max_tokens)])
+        if max_tokens:
+            cmd.extend(['--max-tokens', str(max_tokens)])
         
         # Add temperature if specified
-        if cli_config.temperature is not None:
-            cmd.extend(['--temperature', str(cli_config.temperature)])
+        if temperature is not None:
+            cmd.extend(['--temperature', str(temperature)])
         
         # Add base URL if specified
-        if cli_config.base_url:
-            cmd.extend(['--base-url', cli_config.base_url])
+        if base_url:
+            cmd.extend(['--base-url', base_url])
         
         # Add agent-specific configuration
         for key, value in agent.configuration.items():
@@ -669,7 +679,7 @@ class AgentManager:
                 "Executing agent CLI",
                 command=cmd[0],  # Don't log full command to avoid exposing secrets
                 agent=agent.agent.get('name', 'unknown'),
-                timeout=cli_config.timeout_seconds
+                timeout=timeout_seconds
             )
             
             # Execute the CLI command
@@ -683,7 +693,7 @@ class AgentManager:
             
             stdout, stderr = await asyncio.wait_for(
                 process.communicate(input=prompt.encode('utf-8')),
-                timeout=cli_config.timeout_seconds
+                timeout=timeout_seconds
             )
             
             if process.returncode != 0:
@@ -693,7 +703,7 @@ class AgentManager:
             return stdout.decode('utf-8')
         
         except asyncio.TimeoutError:
-            raise TimeoutError(f"Agent CLI execution timed out after {cli_config.timeout_seconds} seconds")
+            raise TimeoutError(f"Agent CLI execution timed out after {timeout_seconds} seconds")
         except Exception as e:
             logger.error(
                 "CLI execution failed",

@@ -4,6 +4,16 @@ author: 'Tal Muskal'
 runs:
   using: 'docker'
   image: 'docker://ghcr.io/a5c-ai/gitagent:latest'
+  env:
+    GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
+    OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+    ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+    # EXECUTABLE_PATH: ${{ inputs.executable-path }}
+    # ADDITIONAL_ARGS: ${{ inputs.additional-args }}
+    # MODEL: ${{ inputs.model }}
+    # MAX_TOKENS: ${{ inputs.max-tokens }}
+    # TEMPERATURE: ${{ inputs.temperature }}
+    # BASE_URL: ${{ inputs.base-url }}
   args:
     - python3
     - -m
@@ -11,7 +21,11 @@ runs:
     - --log-level
     - "${{ inputs.log-level }}"
     - process
-    
+    - --claude_code_sdk.api_key
+    - "${{ inputs.claude-api-key }}"
+    - --claude.api_key
+    - "${{ inputs.claude-api-key }}"
+
 
   
 branding:
@@ -110,12 +124,7 @@ inputs:
     required: false
     default: '.github/action-handlers'
   
-  # Agent CLI API Keys
-  claude-api-key:
-    description: 'Anthropic Claude API key'
-    required: false
-    default: ''
-  
+  # Agent CLI API Keys 
   gemini-api-key:
     description: 'Google Gemini API key'
     required: false
@@ -127,6 +136,6 @@ inputs:
     default: ''
   
   anthropic-api-key:
-    description: 'Alternative Anthropic API key'
+    description: 'Anthropic API key'
     required: false
     default: ''

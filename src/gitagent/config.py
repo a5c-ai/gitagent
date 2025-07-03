@@ -106,17 +106,14 @@ class Settings(BaseSettings):
     agents_enabled: bool = Field(default=True, description="Enable agent processing")
     
     # Agent CLI Configurations
-    codex_cli: Optional[AgentCliConfiguration] = Field(None, description="Codex/OpenAI CLI configuration")
-    gemini_cli: Optional[AgentCliConfiguration] = Field(None, description="Gemini CLI configuration")
-    claude_cli: Optional[AgentCliConfiguration] = Field(None, description="Claude Code configuration")
     claude_code_sdk: Optional[ClaudeCodeSDKConfiguration] = Field(None, description="Claude Code SDK configuration")
-    custom_cli: Optional[AgentCliConfiguration] = Field(None, description="Custom CLI configuration")
+    cli: Optional[AgentCliConfiguration] = Field(None, description="Custom CLI configuration")
     
     # Agent CLI Environment Variables
-    gemini_api_key: Optional[str] = Field(None, description="Gemini API key")
-    claude_api_key: Optional[str] = Field(None, description="Claude API key")
-    openai_api_key: Optional[str] = Field(None, description="OpenAI API key (used for Codex agents)")
-    anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
+    gemini_api_key: Optional[str] = Field(default=os.getenv("GEMINI_API_KEY", ""), description="Gemini API key")
+    claude_api_key: Optional[str] = Field(default=os.getenv("CLAUDE_API_KEY", ""), description="Claude API key")
+    openai_api_key: Optional[str] = Field(default=os.getenv("OPENAI_API_KEY", ""), description="OpenAI API key (used for Codex agents)")
+    anthropic_api_key: Optional[str] = Field(default=os.getenv("ANTHROPIC_API_KEY", ""), description="Anthropic API key")
     
     model_config = {
         "env_file": ".env",
@@ -214,6 +211,7 @@ class Settings(BaseSettings):
             "codex": self.codex_cli,
             "gemini": self.gemini_cli,
             "claude": self.claude_cli,
+            "claude_code_sdk": self.claude_code_sdk,
             "custom": self.custom_cli,
         }
         return configs.get(agent_type.lower())
