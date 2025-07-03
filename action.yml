@@ -5,6 +5,9 @@ runs:
   using: 'docker'
   image: 'docker://ghcr.io/a5c-ai/gitagent:latest'
   args:
+    - python3
+    - -m
+    - gitagent.main
     - --github-token
     - ${{ inputs.github-token }}
     - --log-level
