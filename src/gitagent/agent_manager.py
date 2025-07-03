@@ -637,20 +637,25 @@ class AgentManager:
         env.update(env_vars)
         executable_path = os.getenv("EXECUTABLE_PATH", "")
         # resolve the executable path according to the agent type
-        if agent_type == "claude":
-            executable_path = "claude"
-        elif agent_type == "gemini":
-            executable_path = "gemini"
-        elif agent_type == "codex":
-            executable_path = "codex"
+        
         additional_args = os.getenv("ADDITIONAL_ARGS", "")
         model = os.getenv("MODEL", "")
         max_tokens = os.getenv("MAX_TOKENS", "")
         temperature = os.getenv("TEMPERATURE", "")
         base_url = os.getenv("BASE_URL", "")
         timeout_seconds = os.getenv("TIMEOUT_SECONDS", 900)
+        additional_args = []
+        if agent_type == "claude":
+            executable_path = "claude"
+            additional_args = ["-d", "--model", "sonnet","--dangerously-skip-permissions",prompt]
+        elif agent_type == "gemini":
+            executable_path = "gemini"            
+            additional_args = ["-y" ,"--model", "gemini-2.0-flash","-p",prompt]
+        elif agent_type == "codex":
+            executable_path = "codex"
+            # additional_args = ["--api-key", env_vars["OPENAI_API_KEY"]]
         # Build command arguments
-        cmd = [executable_path]
+        cmd = ["/opt/cli-tools/bin/"+executable_path]
         cmd.extend(additional_args)
         
         # Add model if specified
