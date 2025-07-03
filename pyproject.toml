@@ -67,6 +67,9 @@ dependencies = [
     
     # Type hints
     "typing-extensions>=4.8.0",
+    
+    # Claude Code SDK
+    "claude-code-sdk>=0.0.0",
 ]
 
 [project.optional-dependencies]

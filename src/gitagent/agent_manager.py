@@ -39,6 +39,7 @@ from .git_operations import (
     GitHubAPIError,
 )
 from .template_functions import render_template_with_file_inclusion
+from .claude_code_sdk_executor import ClaudeCodeSDKExecutor
 
 logger = structlog.get_logger()
 
@@ -61,6 +62,34 @@ class AgentManager:
         self._git_ops: Optional[GitOperations] = None
         self._branch_automation: Optional[BranchAutomationManager] = None
         self._github_token = github_token
+        
+        # Claude Code SDK executor (initialized when needed)
+        self._claude_code_sdk_executor: Optional[ClaudeCodeSDKExecutor] = None
+    
+    def _get_claude_code_sdk_executor(self) -> Optional[ClaudeCodeSDKExecutor]:
+        """Get or create Claude Code SDK executor."""
+        if self._claude_code_sdk_executor is None:
+            sdk_config = settings.get_claude_code_sdk_config()
+            if sdk_config:
+                self._claude_code_sdk_executor = ClaudeCodeSDKExecutor(sdk_config)
+        return self._claude_code_sdk_executor
+    
+    async def health_check_claude_code_sdk(self) -> Dict[str, Any]:
+        """Perform health check for Claude Code SDK executor."""
+        sdk_executor = self._get_claude_code_sdk_executor()
+        if not sdk_executor:
+            return {
+                "status": "unavailable",
+                "error": "Claude Code SDK executor not configured"
+            }
+        
+        try:
+            return await sdk_executor.health_check()
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e)
+            }
     
     async def discover_agents(
         self,
@@ -401,8 +430,19 @@ class AgentManager:
                 agent, event, github_context, commit_history, enhanced_file_changes
             )
             
-            # Execute the agent CLI
-            output = await self._execute_agent_cli(agent, rendered_prompt)
+            # Execute the agent based on type
+            if agent_type == AgentType.CLAUDE_CODE_SDK:
+                # Use Claude Code SDK executor
+                sdk_executor = self._get_claude_code_sdk_executor()
+                if not sdk_executor:
+                    raise ValueError("Claude Code SDK executor not available")
+                
+                return await sdk_executor.execute_agent(
+                    agent, rendered_prompt, github_context, commit_history, enhanced_file_changes
+                )
+            else:
+                # Use CLI executor for other agent types
+                output = await self._execute_agent_cli(agent, rendered_prompt)
             
             # Initialize result with base information
             result = AgentExecutionResult(

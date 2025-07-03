@@ -91,6 +91,7 @@ class AgentType(str, Enum):
     CODEX = "codex"
     GEMINI = "gemini"
     CLAUDE = "claude"
+    CLAUDE_CODE_SDK = "claude_code_sdk"
     CUSTOM = "custom"
 
 
@@ -120,6 +121,28 @@ class AgentCliConfiguration(BaseModel):
     timeout_seconds: int = Field(default=300, description="Timeout for CLI execution")
     additional_args: List[str] = Field(default_factory=list, description="Additional CLI arguments")
     environment_vars: Dict[str, str] = Field(default_factory=dict, description="Additional environment variables")
+
+
+class ClaudeCodeSDKConfiguration(BaseModel):
+    """Configuration for Claude Code SDK integration."""
+    
+    api_key: Optional[str] = Field(None, description="Claude/Anthropic API key")
+    api_key_env: Optional[str] = Field(None, description="Environment variable containing API key")
+    model: Optional[str] = Field("claude-3-sonnet-20241022", description="Claude model to use")
+    max_tokens: Optional[int] = Field(4000, description="Maximum tokens for responses")
+    temperature: Optional[float] = Field(0.1, description="Temperature for response generation")
+    timeout_seconds: int = Field(300, description="Timeout for SDK execution")
+    max_turns: int = Field(10, description="Maximum conversation turns")
+    system_prompt: Optional[str] = Field(None, description="Custom system prompt")
+    append_system_prompt: Optional[str] = Field(None, description="Text to append to system prompt")
+    output_format: str = Field("text", description="Output format (text, json, stream-json)")
+    use_bedrock: bool = Field(False, description="Use Amazon Bedrock instead of Anthropic API")
+    use_vertex: bool = Field(False, description="Use Google Vertex AI instead of Anthropic API")
+    mcp_config_path: Optional[str] = Field(None, description="Path to MCP configuration file")
+    allowed_tools: List[str] = Field(default_factory=list, description="List of allowed tools")
+    disallowed_tools: List[str] = Field(default_factory=list, description="List of disallowed tools")
+    permission_mode: str = Field("default", description="Permission mode (default, acceptEdits, bypassPermissions, plan)")
+    cwd: Optional[str] = Field(None, description="Working directory for Claude Code execution")
 
 
 class McpServerConfig(BaseModel):
@@ -422,6 +445,35 @@ class AgentExecutionResult(BaseModel):
     comment_posted: Optional[str] = Field(None, description="URL of comment posted (if any)")
     issue_created: Optional[int] = Field(None, description="Issue number created (if any)")
     issue_url: Optional[str] = Field(None, description="URL of created issue (if any)")
+    
+    # Claude Code SDK specific results
+    session_id: Optional[str] = Field(None, description="Claude Code SDK session ID")
+    total_cost_usd: Optional[float] = Field(None, description="Total cost in USD")
+    num_turns: Optional[int] = Field(None, description="Number of conversation turns")
+    duration_api_ms: Optional[float] = Field(None, description="API duration in milliseconds")
+
+
+class ClaudeCodeSDKMessage(BaseModel):
+    """Model for Claude Code SDK messages."""
+    
+    type: str = Field(..., description="Message type (user, assistant, result, system)")
+    subtype: Optional[str] = Field(None, description="Message subtype")
+    session_id: Optional[str] = Field(None, description="Session ID")
+    message: Optional[Dict[str, Any]] = Field(None, description="Message content")
+    duration_ms: Optional[float] = Field(None, description="Duration in milliseconds")
+    duration_api_ms: Optional[float] = Field(None, description="API duration in milliseconds")
+    is_error: Optional[bool] = Field(None, description="Whether this is an error message")
+    num_turns: Optional[int] = Field(None, description="Number of turns")
+    result: Optional[str] = Field(None, description="Result text")
+    total_cost_usd: Optional[float] = Field(None, description="Total cost in USD")
+    
+    # System message specific fields
+    api_key_source: Optional[str] = Field(None, description="API key source")
+    cwd: Optional[str] = Field(None, description="Working directory")
+    tools: Optional[List[str]] = Field(None, description="Available tools")
+    mcp_servers: Optional[List[Dict[str, Any]]] = Field(None, description="MCP servers")
+    model: Optional[str] = Field(None, description="Model name")
+    permission_mode: Optional[str] = Field(None, description="Permission mode")
 
 
 class GitHubEvent(BaseModel):

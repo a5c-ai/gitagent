@@ -205,6 +205,7 @@ priority: 10  # Lower = higher priority
 - **Codex**: OpenAI models including Codex (requires `OPENAI_API_KEY`) - Uses built-in `codex` CLI
 - **Gemini**: Google's Gemini AI (requires `GEMINI_API_KEY`) - Uses built-in `gemini` CLI
 - **Claude**: Anthropic's Claude AI (requires `CLAUDE_API_KEY`) - Uses built-in `claude` CLI
+- **Claude Code SDK**: Advanced Claude integration with direct Python SDK access (requires `CLAUDE_API_KEY`) - Uses Claude Code SDK for enhanced capabilities
 - **Custom**: Custom CLI implementation
 
 ### Built-in CLI Tools
@@ -507,6 +508,212 @@ agent:
 ```
 
 The built-in CLI tools support all standard command-line arguments and can be configured with appropriate API keys through environment variables.
+
+### Claude Code SDK Integration
+
+gitagent now includes **advanced Claude Code SDK integration** that provides superior capabilities compared to the CLI approach:
+
+#### Benefits of Claude Code SDK
+
+✅ **Direct Python SDK Integration** - No subprocess overhead, better performance  
+✅ **Structured Message Handling** - Access to rich message types and metadata  
+✅ **Multi-turn Conversations** - Session management for complex workflows  
+✅ **Advanced Configuration** - Fine-grained control over tools and permissions  
+✅ **Better Error Handling** - Detailed error information and recovery  
+✅ **Cost Tracking** - Built-in usage and cost monitoring  
+✅ **MCP Support** - Native Model Context Protocol integration  
+
+#### Claude Code SDK Agent Configuration
+
+```yaml
+agent:
+  type: "claude_code_sdk"  # Use the advanced SDK integration
+  name: "claude-code-reviewer"
+  description: "Advanced Claude Code SDK agent with enhanced capabilities"
+  version: "1.0.0"
+
+configuration:
+  model: "claude-3-sonnet-20241022"
+  max_tokens: 4000
+  temperature: 0.1
+  max_turns: 10                    # Multi-turn conversation support
+  system_prompt: "You are an expert code reviewer..."
+  append_system_prompt: "Always provide constructive feedback."
+  output_format: "text"            # Options: text, json, stream-json
+  permission_mode: "acceptEdits"   # Options: default, acceptEdits, bypassPermissions, plan
+  use_bedrock: false               # Use Amazon Bedrock instead of Anthropic API
+  use_vertex: false                # Use Google Vertex AI instead of Anthropic API
+  
+  # Tool Configuration
+  allowed_tools: ["file_editor", "bash", "computer"]
+  disallowed_tools: ["web_search"]
+  
+  # MCP Configuration
+  mcp_config_path: ".claude/mcp_config.json"
+
+triggers:
+  files_changed: ["*.py", "*.js", "*.ts"]
+  include_file_content: true
+  include_file_diff: true
+
+prompt_template: |
+  You are an expert code reviewer with full file system access through the Claude Code SDK.
+  
+  ## Repository Context
+  - **Repository:** {{ github_context.repository }}
+  - **Event:** {{ github_context.event_name }}
+  - **Files Changed:** {{ files_changed | length }}
+  
+  ## Enhanced Capabilities
+  With the Claude Code SDK, you can:
+  - Read and analyze any file in the repository
+  - Execute bash commands for testing
+  - Create and modify files directly
+  - Access structured project information
+  - Maintain conversation context across turns
+  
+  ## Files to Review
+  {% for file in files_changed %}
+  - **{{ file.filename }}** ({{ file.status }})
+  {% endfor %}
+  
+  Please provide a comprehensive code review with specific recommendations.
+
+output:
+  destination: "comment"
+  comment_template: |
+    ## 🚀 Claude Code SDK Review
+    
+    **Session ID:** {{ session_id }}
+    **Turns:** {{ num_turns }}
+    **Cost:** ${{ total_cost_usd }}
+    
+    {{ output }}
+    
+    ---
+    *Powered by Claude Code SDK*
+
+enabled: true
+```
+
+#### Key Features of Claude Code SDK Integration
+
+1. **Session Management**: Maintains conversation state across multiple interactions
+2. **Rich Metadata**: Access to cost tracking, timing, and session information
+3. **Advanced Permissions**: Fine-grained control over tool usage and file access
+4. **Multi-Provider Support**: Works with Anthropic API, Amazon Bedrock, or Google Vertex AI
+5. **Structured Output**: Support for JSON and streaming JSON response formats
+6. **MCP Integration**: Native support for Model Context Protocol servers
+
+#### Configuration Options
+
+The Claude Code SDK agent supports extensive configuration options:
+
+```yaml
+configuration:
+  # Model Configuration
+  model: "claude-3-sonnet-20241022"     # Claude model to use
+  max_tokens: 4000                      # Maximum response tokens
+  temperature: 0.1                      # Response randomness (0.0-1.0)
+  timeout_seconds: 300                  # Request timeout
+  
+  # Conversation Management
+  max_turns: 10                         # Maximum conversation turns
+  system_prompt: "Custom system prompt"
+  append_system_prompt: "Additional instructions"
+  
+  # Output Format
+  output_format: "text"                 # text, json, stream-json
+  
+  # Tool Management
+  allowed_tools: ["file_editor", "bash"]
+  disallowed_tools: ["web_search"]
+  permission_mode: "acceptEdits"        # default, acceptEdits, bypassPermissions, plan
+  
+  # Provider Configuration
+  use_bedrock: false                    # Use Amazon Bedrock
+  use_vertex: false                     # Use Google Vertex AI
+  
+  # MCP Configuration
+  mcp_config_path: ".claude/mcp_config.json"
+  
+  # Working Directory
+  cwd: "/workspace"                     # Custom working directory
+```
+
+#### Usage Examples
+
+**Basic Code Review Agent:**
+```yaml
+agent:
+  type: "claude_code_sdk"
+  name: "code-reviewer"
+
+configuration:
+  model: "claude-3-sonnet-20241022"
+  max_tokens: 4000
+  permission_mode: "acceptEdits"
+  allowed_tools: ["file_editor"]
+```
+
+**Advanced Multi-Turn Agent:**
+```yaml
+agent:
+  type: "claude_code_sdk"
+  name: "interactive-assistant"
+
+configuration:
+  max_turns: 20
+  system_prompt: "You are a helpful coding assistant."
+  permission_mode: "bypassPermissions"
+  output_format: "json"
+  use_bedrock: true
+```
+
+**Secure Analysis Agent:**
+```yaml
+agent:
+  type: "claude_code_sdk"
+  name: "security-analyzer"
+
+configuration:
+  permission_mode: "default"
+  disallowed_tools: ["bash", "computer"]
+  allowed_tools: ["file_editor"]
+  max_turns: 5
+```
+
+#### Claude CLI vs Claude Code SDK Comparison
+
+Choose the right Claude integration for your needs:
+
+| Feature | Claude CLI | Claude Code SDK |
+|---------|------------|----------------|
+| **Performance** | Good | Excellent (no subprocess overhead) |
+| **Configuration** | Basic | Advanced (fine-grained control) |
+| **Error Handling** | Standard | Rich error information |
+| **Cost Tracking** | None | Built-in usage monitoring |
+| **Multi-turn Support** | No | Yes (session management) |
+| **Tool Control** | Limited | Fine-grained permissions |
+| **Output Formats** | Text only | Text, JSON, streaming JSON |
+| **Provider Support** | Anthropic API | Anthropic API, Bedrock, Vertex AI |
+| **MCP Integration** | No | Native support |
+| **Setup Complexity** | Simple | Moderate |
+| **Use Case** | Simple prompts | Complex workflows |
+
+**When to use Claude CLI:**
+- Simple prompt/response interactions
+- Basic code review tasks
+- Quick prototyping
+- Minimal configuration needs
+
+**When to use Claude Code SDK:**
+- Complex multi-step workflows
+- Need for session management
+- Advanced tool usage control
+- Cost tracking requirements
+- Integration with MCP servers
+- Custom permission models
 
 ### CLI Management
 
@@ -913,9 +1120,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [structlog](https://www.structlog.org/) for structured logging
 - [GitHub](https://github.com/) for the comprehensive webhook system
 
-## 🚀 Quick Start with Built-in CLI Tools
+## 🚀 Quick Start with Built-in CLI Tools and SDK Integration
 
-gitagent includes pre-installed CLI tools for all major AI providers, making it incredibly easy to get started:
+gitagent includes pre-installed CLI tools for all major AI providers **plus advanced Claude Code SDK integration** for enhanced capabilities:
 
 ### Simple Agent Configuration
 
@@ -932,6 +1139,12 @@ agent:
   name: "my-claude-reviewer"
   executable: "claude"  # No path required!
 
+# Claude Code SDK Agent - Advanced integration for complex workflows
+agent:
+  type: "claude_code_sdk"
+  name: "my-advanced-claude-agent"
+  # No executable needed - uses Python SDK directly!
+
 # Gemini Agent - Pre-installed for convenience
 agent:
   type: "gemini" 
@@ -939,21 +1152,23 @@ agent:
   executable: "gemini"  # No path required!
 ```
 
-### Benefits of Built-in CLI Tools
+### Benefits of Built-in Tools and SDK Integration
 
 ✅ **Zero Configuration** - No need to install or configure CLI tools manually  
 ✅ **Consistent Versions** - All tools are tested and compatible  
 ✅ **Simplified Configs** - Just specify the tool name, not the full path  
 ✅ **Ready to Use** - Docker image includes everything you need  
 ✅ **Security** - Tools are installed in a controlled, secure environment  
+✅ **Advanced SDK** - Claude Code SDK provides enhanced capabilities for complex workflows  
 
 ### Getting Started
 
 1. **Set API Keys** - Add your API keys as environment variables
 2. **Create Agents** - Use the simple configuration format above
-3. **Deploy** - Run the action and your agents will work immediately
+3. **Choose Integration** - Use CLI for simple tasks, SDK for complex workflows
+4. **Deploy** - Run the action and your agents will work immediately
 
-No complex setup, no path configuration, no CLI installation - just pure AI-powered automation!
+No complex setup, no path configuration, no CLI installation - just pure AI-powered automation with advanced SDK capabilities!
 
 ## 📞 Support
 

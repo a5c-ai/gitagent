@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Set
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
-from .models import AgentCliConfiguration
+from .models import AgentCliConfiguration, ClaudeCodeSDKConfiguration
 
 
 class Settings(BaseSettings):
@@ -109,6 +109,7 @@ class Settings(BaseSettings):
     codex_cli: Optional[AgentCliConfiguration] = Field(None, description="Codex/OpenAI CLI configuration")
     gemini_cli: Optional[AgentCliConfiguration] = Field(None, description="Gemini CLI configuration")
     claude_cli: Optional[AgentCliConfiguration] = Field(None, description="Claude Code configuration")
+    claude_code_sdk: Optional[ClaudeCodeSDKConfiguration] = Field(None, description="Claude Code SDK configuration")
     custom_cli: Optional[AgentCliConfiguration] = Field(None, description="Custom CLI configuration")
     
     # Agent CLI Environment Variables
@@ -217,12 +218,17 @@ class Settings(BaseSettings):
         }
         return configs.get(agent_type.lower())
     
+    def get_claude_code_sdk_config(self) -> Optional[ClaudeCodeSDKConfiguration]:
+        """Get Claude Code SDK configuration."""
+        return self.claude_code_sdk
+    
     def get_agent_api_key(self, agent_type: str) -> Optional[str]:
         """Get API key for agent type."""
         keys = {
             "codex": self.openai_api_key,
             "gemini": self.gemini_api_key,
             "claude": self.claude_api_key or self.anthropic_api_key,
+            "claude_code_sdk": self.claude_api_key or self.anthropic_api_key,
         }
         return keys.get(agent_type.lower())
     
@@ -258,6 +264,20 @@ class Settings(BaseSettings):
                 timeout_seconds=300
             )
         
+        # Claude Code SDK configuration
+        if not self.claude_code_sdk and (self.claude_api_key or self.anthropic_api_key):
+            self.claude_code_sdk = ClaudeCodeSDKConfiguration(
+                api_key=self.claude_api_key or self.anthropic_api_key,
+                api_key_env="CLAUDE_API_KEY",
+                model="claude-3-sonnet-20241022",
+                max_tokens=4000,
+                temperature=0.1,
+                timeout_seconds=300,
+                max_turns=10,
+                output_format="text",
+                cwd=self.github_workspace
+            )
+        
 
     
     def get_available_agent_types(self) -> List[str]:
@@ -269,6 +289,8 @@ class Settings(BaseSettings):
             available.append("gemini")
         if self.claude_cli or self.claude_api_key or self.anthropic_api_key:
             available.append("claude")
+        if self.claude_code_sdk or self.claude_api_key or self.anthropic_api_key:
+            available.append("claude_code_sdk")
         if self.custom_cli:
             available.append("custom")
         return available
