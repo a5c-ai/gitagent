@@ -1,7 +1,9 @@
 name: 'gitagent'
 description: 'GitHub Action that executes AI-GitOps agents from the prompts in your repo'
 author: 'Tal Muskal'
-
+runs:
+  using: 'docker'
+  image: 'ghcr.io/a5c-ai/gitagent:latest'
 branding:
   icon: 'activity'
   color: 'blue'

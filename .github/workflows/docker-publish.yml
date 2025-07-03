@@ -94,24 +94,6 @@ jobs:
         provenance: true
         sbom: true
 
-    - name: Build development image
-      uses: docker/build-push-action@v5
-      if: github.event_name != 'pull_request'
-      with:
-        context: .
-        target: development
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: |
-          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
-          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev-${{ github.sha }}
-        labels: ${{ steps.meta.outputs.labels }}
-        build-args: |
-          BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
-          VCS_REF=${{ github.sha }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-
   test-image:
     name: Test Docker Image
     runs-on: ubuntu-latest
