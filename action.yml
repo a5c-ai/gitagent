@@ -21,10 +21,6 @@ runs:
     - --log-level
     - "${{ inputs.log-level }}"
     - process
-    - --claude_code_sdk.api_key
-    - "${{ inputs.claude-api-key }}"
-    - --claude.api_key
-    - "${{ inputs.claude-api-key }}"
 
 
   
