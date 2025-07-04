@@ -133,49 +133,6 @@ ENTRYPOINT ["/usr/bin/tini", "--"]
 # Default command
 CMD ["python3", "-m", "gitagent.main"]
 
-# Development stage (optional)
-FROM production AS development
-
-# Switch back to root for development tools installation
-USER root
-
-# Install development dependencies
-RUN apt-get update && apt-get install -y \
-    vim \
-    less \
-    htop \
-    strace \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install development Python packages
-RUN pip install --no-cache-dir \
-    pytest \
-    pytest-asyncio \
-    pytest-cov \
-    black \
-    isort \
-    flake8 \
-    mypy \
-    pre-commit
-
-# Switch back to app user
-USER gitagent
-
-# Override default command for development
-CMD ["python3", "-m", "gitagent.main", "--debug", "--reload"]
-
-# Testing stage
-FROM builder AS testing
-
-# Install test dependencies (virtual environment already activated from builder)
-RUN pip install --no-cache-dir .[test]
-
-# Copy test files
-COPY tests/ ./tests/
-
-# Run tests
-RUN python3 -m pytest tests/ -v --cov=src/gitagent --cov-report=xml --cov-report=term-missing
-
 # Final production stage
 FROM production AS final
 

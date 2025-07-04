@@ -1,6 +1,72 @@
 name: 'gitagent'
 description: 'GitHub Action that executes AI-GitOps agents from the prompts in your repo'
 author: 'Tal Muskal'
+runs:
+  using: 'docker'
+  image: 'docker://ghcr.io/a5c-ai/gitagent:latest'
+  env:
+    GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
+    OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+    ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+    # EXECUTABLE_PATH: ${{ inputs.executable-path }}
+    # ADDITIONAL_ARGS: ${{ inputs.additional-args }}
+    # MODEL: ${{ inputs.model }}
+    # MAX_TOKENS: ${{ inputs.max-tokens }}
+    # TEMPERATURE: ${{ inputs.temperature }}
+    # BASE_URL: ${{ inputs.base-url }}
+    GITHUB_TOKEN: ${{ inputs.github-token }}
+    LOG_LEVEL: ${{ inputs.log-level }}
+    GIT_COMMIT_HISTORY_COUNT: ${{ inputs.git-commit-history-count }}
+    WORKSPACE_PATH: ${{ inputs.workspace-path }}
+    
+    # Agent definition
+    AGENT_TYPE: ${{ inputs.agent-type }}
+    AGENT_NAME: ${{ inputs.agent-name }}
+    AGENT_DESCRIPTION: ${{ inputs.agent-description }}
+    AGENT_VERSION: ${{ inputs.agent-version }}
+    EXECUTABLE: ${{ inputs.executable }}
+    
+    # Agent configuration
+    MODEL: ${{ inputs.model }}
+    MAX_TOKENS: ${{ inputs.max-tokens }}
+    TEMPERATURE: ${{ inputs.temperature }}
+    TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
+    
+    # Claude Code SDK specific
+    MAX_TURNS: ${{ inputs.max-turns }}
+    SYSTEM_PROMPT: ${{ inputs.system-prompt }}
+    APPEND_SYSTEM_PROMPT: ${{ inputs.append-system-prompt }}
+    OUTPUT_FORMAT: ${{ inputs.output-format }}
+    PERMISSION_MODE: ${{ inputs.permission-mode }}
+    ALLOWED_TOOLS: ${{ inputs.allowed-tools }}
+    DISALLOWED_TOOLS: ${{ inputs.disallowed-tools }}
+    USE_BEDROCK: ${{ inputs.use-bedrock }}
+    USE_VERTEX: ${{ inputs.use-vertex }}
+    
+    # Prompt and context
+    PROMPT_TEMPLATE: ${{ inputs.prompt-template }}
+    PROMPT_TEMPLATE_FILE: ${{ inputs.prompt-template-file }}
+    INCLUDE_FILE_CONTENT: ${{ inputs.include-file-content }}
+    INCLUDE_FILE_DIFF: ${{ inputs.include-file-diff }}
+    FILE_DIFF_CONTEXT: ${{ inputs.file-diff-context }}
+    
+    # Output configuration
+    OUTPUT_FILE: ${{ inputs.output-file }}
+    OUTPUT_FORMAT_TYPE: ${{ inputs.output-format-type }}
+    MAX_OUTPUT_LENGTH: ${{ inputs.max-output-length }}
+  args:
+    - python3
+    - -m
+    - gitagent.main
+    - --log-level
+    - "${{ inputs.log-level }}"
+    - execute-agent
+
+
+  
+branding:
+  icon: 'activity'
+  color: 'blue'
 
 inputs:
   # Authentication & Core Configuration
@@ -217,57 +283,6 @@ outputs:
   output-file-path:
     description: 'Path to the output file (if output-file was specified)'
 
-runs:
-  using: 'docker'
-  image: 'Dockerfile'
-  env:
-    # Core configuration
-    GITHUB_TOKEN: ${{ inputs.github-token }}
-    LOG_LEVEL: ${{ inputs.log-level }}
-    GIT_COMMIT_HISTORY_COUNT: ${{ inputs.git-commit-history-count }}
-    WORKSPACE_PATH: ${{ inputs.workspace-path }}
-    
-    # Agent definition
-    AGENT_TYPE: ${{ inputs.agent-type }}
-    AGENT_NAME: ${{ inputs.agent-name }}
-    AGENT_DESCRIPTION: ${{ inputs.agent-description }}
-    AGENT_VERSION: ${{ inputs.agent-version }}
-    EXECUTABLE: ${{ inputs.executable }}
-    
-    # Agent configuration
-    MODEL: ${{ inputs.model }}
-    MAX_TOKENS: ${{ inputs.max-tokens }}
-    TEMPERATURE: ${{ inputs.temperature }}
-    TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
-    
-    # Claude Code SDK specific
-    MAX_TURNS: ${{ inputs.max-turns }}
-    SYSTEM_PROMPT: ${{ inputs.system-prompt }}
-    APPEND_SYSTEM_PROMPT: ${{ inputs.append-system-prompt }}
-    OUTPUT_FORMAT: ${{ inputs.output-format }}
-    PERMISSION_MODE: ${{ inputs.permission-mode }}
-    ALLOWED_TOOLS: ${{ inputs.allowed-tools }}
-    DISALLOWED_TOOLS: ${{ inputs.disallowed-tools }}
-    USE_BEDROCK: ${{ inputs.use-bedrock }}
-    USE_VERTEX: ${{ inputs.use-vertex }}
-    
-    # Prompt and context
-    PROMPT_TEMPLATE: ${{ inputs.prompt-template }}
-    PROMPT_TEMPLATE_FILE: ${{ inputs.prompt-template-file }}
-    INCLUDE_FILE_CONTENT: ${{ inputs.include-file-content }}
-    INCLUDE_FILE_DIFF: ${{ inputs.include-file-diff }}
-    FILE_DIFF_CONTEXT: ${{ inputs.file-diff-context }}
-    
-    # Output configuration
-    OUTPUT_FILE: ${{ inputs.output-file }}
-    OUTPUT_FORMAT_TYPE: ${{ inputs.output-format-type }}
-    MAX_OUTPUT_LENGTH: ${{ inputs.max-output-length }}
-    
-    # API keys
-    CLAUDE_API_KEY: ${{ inputs.claude-api-key }}
-    GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
-    OPENAI_API_KEY: ${{ inputs.openai-api-key }}
-    ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
 
 branding:
   icon: 'cpu'
