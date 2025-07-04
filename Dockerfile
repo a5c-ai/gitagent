@@ -199,5 +199,8 @@ RUN python3 -c "import gitagent; print('gitagent and dependencies installed succ
     claude --help && echo "Claude Code installed successfully" && \
     gemini --help && echo "Gemini CLI installed successfully"
 
+# show the path of the claude cli
+RUN which claude
+
 # Default command
 CMD ["python3", "-m", "gitagent.main"] 
