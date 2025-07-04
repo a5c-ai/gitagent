@@ -151,8 +151,17 @@ RUN python3 -c "import gitagent; print('gitagent and dependencies installed succ
     claude --help && echo "Claude Code installed successfully" && \
     gemini --help && echo "Gemini CLI installed successfully"
 
-# show the path of the claude cli
-RUN which claude
+
+
+# Create necessary directories and set permissions
+RUN mkdir -p /app/logs /app/data /app/config /app/.claude /github/home && \
+    mkdir -p /github/home/.claude && \
+    echo '{"permissions": {"defaultMode": "default"}}' > /app/.claude/settings.json && \
+    echo '{"permissions": {"defaultMode": "default"}}' > /github/home/.claude/settings.json && \
+    chown -R gitagent:gitagent /app && \
+    chmod -R 755 /app && \
+    chmod -R 755 /github/home && \
+    chown -R gitagent:gitagent /github/home || true
 
 # Default command
 CMD ["python3", "-m", "gitagent.main", "execute-agent"] 
