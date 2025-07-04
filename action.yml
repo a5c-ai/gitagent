@@ -62,12 +62,6 @@ runs:
     - "${{ inputs.log-level }}"
     - execute-agent
 
-
-  
-branding:
-  icon: 'activity'
-  color: 'blue'
-
 inputs:
   # Authentication & Core Configuration
   github-token:
