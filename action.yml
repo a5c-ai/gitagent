@@ -19,6 +19,11 @@ runs:
     GIT_COMMIT_HISTORY_COUNT: ${{ inputs.git-commit-history-count }}
     WORKSPACE_PATH: ${{ inputs.workspace-path }}
     
+    # Claude CLI configuration
+    DISABLE_AUTOUPDATER: '1'
+    DISABLE_TELEMETRY: '1'
+    CLAUDE_CONFIG_PATH: '/app/.claude'
+    
     # Agent definition
     AGENT_TYPE: ${{ inputs.agent-type }}
     AGENT_NAME: ${{ inputs.agent-name }}

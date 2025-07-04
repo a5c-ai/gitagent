@@ -82,9 +82,14 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app/build/src ./src
 
 # Create necessary directories and set permissions
-RUN mkdir -p /app/logs /app/data /app/config && \
+RUN mkdir -p /app/logs /app/data /app/config /app/.claude /github/home && \
+    mkdir -p /github/home/.claude && \
+    echo '{"permissions": {"defaultMode": "default"}}' > /app/.claude/settings.json && \
+    echo '{"permissions": {"defaultMode": "default"}}' > /github/home/.claude/settings.json && \
     chown -R gitagent:gitagent /app && \
-    chmod -R 755 /app
+    chmod -R 755 /app && \
+    chmod -R 755 /github/home && \
+    chown -R gitagent:gitagent /github/home || true
 
 # Switch to non-root user
 USER gitagent
@@ -94,7 +99,10 @@ ENV PATH="/opt/venv/bin:/opt/cli-tools/bin:/usr/lib/node_modules/.bin:$PATH" \
     PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    HOME=/app
+    HOME=/app \
+    CLAUDE_CONFIG_PATH=/app/.claude \
+    DISABLE_AUTOUPDATER=1 \
+    DISABLE_TELEMETRY=1
 
 # Default configuration
 ENV HOST=0.0.0.0 \
