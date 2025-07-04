@@ -221,7 +221,10 @@ class Settings(BaseSettings):
     
     def get_claude_code_sdk_config(self) -> Optional[ClaudeCodeSDKConfiguration]:
         """Get Claude Code SDK configuration."""
-        return self.claude_code_sdk
+        return ClaudeCodeSDKConfiguration(
+            api_key=self.anthropic_api_key,
+            model="sonnet"
+        )
     
     def get_agent_api_key(self, agent_type: str) -> Optional[str]:
         """Get API key for agent type."""

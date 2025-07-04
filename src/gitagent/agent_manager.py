@@ -651,7 +651,7 @@ class AgentManager:
             executable_path = "/usr/bin/claude"
             # Claude CLI expects input via stdin, not as arguments
             # Use non-interactive mode with appropriate flags
-            additional_args = ["--no-interactive", "--model", "claude-3-5-sonnet-20241022"]
+            additional_args = ["--no-interactive", "--model", "sonnet", prompt]
         elif agent_type == "gemini":
             executable_path = "gemini"            
             additional_args = ["-y" ,"--model", "gemini-2.0-flash","-p",prompt]
