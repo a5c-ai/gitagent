@@ -314,12 +314,6 @@ def create_agent_definition_from_env() -> AgentDefinition:
     if os.getenv("USE_VERTEX"):
         configuration["use_vertex"] = get_env_bool("USE_VERTEX")
     
-    # Triggers (simplified for single-agent mode)
-    triggers = AgentTriggers(
-        include_file_content=get_env_bool("INCLUDE_FILE_CONTENT"),
-        include_file_diff=get_env_bool("INCLUDE_FILE_DIFF"),
-        file_diff_context=get_env_int("FILE_DIFF_CONTEXT", 3)
-    )
     
     # Output configuration
     output_config = AgentOutputConfig(
@@ -351,7 +345,6 @@ def create_agent_definition_from_env() -> AgentDefinition:
     return AgentDefinition(
         agent=agent_dict,
         configuration=configuration,
-        triggers=triggers,
         prompt_template=prompt_template,
         output=output_config,
         enabled=True,

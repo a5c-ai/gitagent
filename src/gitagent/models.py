@@ -155,23 +155,6 @@ class McpServerConfig(BaseModel):
     timeout_seconds: int = Field(default=30, description="Timeout for server connections")
 
 
-class AgentTriggerCondition(BaseModel):
-    """Trigger conditions for when an agent should run."""
-    
-    branches: Optional[List[str]] = Field(None, description="Branch patterns (glob)")
-    tags: Optional[List[str]] = Field(None, description="Tag patterns (glob)")
-    paths: Optional[List[str]] = Field(None, description="File path patterns (glob)")
-    conditions: Optional[List[str]] = Field(None, description="Jinja2 template conditions")
-    event_actions: Optional[List[str]] = Field(None, description="Specific event actions")
-    files_changed_min: Optional[int] = Field(None, description="Minimum files changed")
-    files_changed_max: Optional[int] = Field(None, description="Maximum files changed")
-    
-    # File-specific change monitoring
-    files_changed: Optional[List[str]] = Field(None, description="Specific file patterns that must have changed (glob)")
-    include_file_content: bool = Field(default=False, description="Include file content in template variables")
-    include_file_diff: bool = Field(default=False, description="Include file diff in template variables")
-    file_diff_context: int = Field(default=3, description="Number of context lines for file diffs")
-
 
 class AgentOutputConfig(BaseModel):
     """Configuration for agent output handling."""
@@ -242,7 +225,6 @@ class AgentDefinition(BaseModel):
     
     agent: Dict[str, Any] = Field(..., description="Agent metadata")
     configuration: Dict[str, Any] = Field(default_factory=dict, description="Agent configuration")
-    triggers: AgentTriggerCondition = Field(default_factory=AgentTriggerCondition, description="When to run this agent")
     prompt_template: str = Field(..., description="Jinja2 template for the agent prompt")
     mcp_servers: List[McpServerConfig] = Field(default_factory=list, description="MCP servers for this agent")
     output: AgentOutputConfig = Field(default_factory=AgentOutputConfig, description="Output configuration")
