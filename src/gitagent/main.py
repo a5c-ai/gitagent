@@ -17,7 +17,15 @@ import structlog
 
 from .config import Settings
 from .event_handler import GitHubActionEventProcessor
-from .models import GitHubEvent, GitHubActionContext, AgentDefinition, AgentType
+from .models import (
+    GitHubEvent, 
+    GitHubActionContext, 
+    AgentDefinition, 
+    AgentType,
+    AgentTriggers,
+    AgentOutputConfig,
+    OutputDestination
+)
 from .logging_config import setup_logging
 from .agent_manager import agent_manager
 
@@ -29,7 +37,10 @@ def setup_argument_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Process current GitHub Action event
+  # Execute single agent from environment variables (GitHub Action mode)
+  python -m gitagent execute-agent
+
+  # Process current GitHub Action event (legacy mode)
   python -m gitagent process
 
   # Process a specific event file
@@ -76,7 +87,28 @@ Examples:
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     
-    # Process command
+    # Execute single agent command (new GitHub Action mode)
+    execute_agent_parser = subparsers.add_parser(
+        "execute-agent",
+        help="Execute single agent from environment variables"
+    )
+    execute_agent_parser.add_argument(
+        "--event-file",
+        type=Path,
+        help="Path to event JSON file (default: $GITHUB_EVENT_PATH)"
+    )
+    execute_agent_parser.add_argument(
+        "--output-file",
+        type=Path,
+        help="Write processing result to file"
+    )
+    execute_agent_parser.add_argument(
+        "--pretty",
+        action="store_true",
+        help="Pretty-print JSON output"
+    )
+    
+    # Process command (legacy mode)
     process_parser = subparsers.add_parser(
         "process",
         help="Process GitHub Action events"
@@ -205,6 +237,270 @@ Examples:
     )
     
     return parser
+
+
+def create_agent_definition_from_env() -> AgentDefinition:
+    """Create agent definition from environment variables."""
+    def get_env_bool(key: str, default: bool = False) -> bool:
+        """Get boolean value from environment variable."""
+        value = os.getenv(key, str(default)).lower()
+        return value in ('true', '1', 'yes', 'on')
+    
+    def get_env_int(key: str, default: int = 0) -> int:
+        """Get integer value from environment variable."""
+        try:
+            return int(os.getenv(key, str(default)))
+        except ValueError:
+            return default
+    
+    def get_env_float(key: str, default: float = 0.0) -> float:
+        """Get float value from environment variable."""
+        try:
+            return float(os.getenv(key, str(default)))
+        except ValueError:
+            return default
+    
+    def get_env_list(key: str, default: Optional[list] = None) -> list:
+        """Get list value from environment variable (comma-separated)."""
+        value = os.getenv(key, "")
+        if not value:
+            return default or []
+        return [item.strip() for item in value.split(',') if item.strip()]
+    
+    # Agent definition
+    agent_dict = {
+        "type": os.getenv("AGENT_TYPE", "custom"),
+        "name": os.getenv("AGENT_NAME", "ai-agent"),
+        "description": os.getenv("AGENT_DESCRIPTION", "AI agent execution"),
+        "version": os.getenv("AGENT_VERSION", "1.0.0"),
+    }
+    
+    # Add executable if specified
+    if os.getenv("EXECUTABLE"):
+        agent_dict["executable"] = os.getenv("EXECUTABLE")
+    
+    # Agent configuration
+    configuration = {}
+    
+    # Basic configuration
+    if os.getenv("MODEL"):
+        configuration["model"] = os.getenv("MODEL")
+    if os.getenv("MAX_TOKENS"):
+        configuration["max_tokens"] = get_env_int("MAX_TOKENS")
+    if os.getenv("TEMPERATURE"):
+        configuration["temperature"] = get_env_float("TEMPERATURE")
+    if os.getenv("TIMEOUT_SECONDS"):
+        configuration["timeout_seconds"] = get_env_int("TIMEOUT_SECONDS")
+    
+    # Claude Code SDK specific configuration
+    if os.getenv("MAX_TURNS"):
+        configuration["max_turns"] = get_env_int("MAX_TURNS")
+    if os.getenv("SYSTEM_PROMPT"):
+        configuration["system_prompt"] = os.getenv("SYSTEM_PROMPT")
+    if os.getenv("APPEND_SYSTEM_PROMPT"):
+        configuration["append_system_prompt"] = os.getenv("APPEND_SYSTEM_PROMPT")
+    if os.getenv("OUTPUT_FORMAT"):
+        configuration["output_format"] = os.getenv("OUTPUT_FORMAT")
+    if os.getenv("PERMISSION_MODE"):
+        configuration["permission_mode"] = os.getenv("PERMISSION_MODE")
+    if os.getenv("ALLOWED_TOOLS"):
+        configuration["allowed_tools"] = get_env_list("ALLOWED_TOOLS")
+    if os.getenv("DISALLOWED_TOOLS"):
+        configuration["disallowed_tools"] = get_env_list("DISALLOWED_TOOLS")
+    if os.getenv("USE_BEDROCK"):
+        configuration["use_bedrock"] = get_env_bool("USE_BEDROCK")
+    if os.getenv("USE_VERTEX"):
+        configuration["use_vertex"] = get_env_bool("USE_VERTEX")
+    
+    # Triggers (simplified for single-agent mode)
+    triggers = AgentTriggers(
+        include_file_content=get_env_bool("INCLUDE_FILE_CONTENT"),
+        include_file_diff=get_env_bool("INCLUDE_FILE_DIFF"),
+        file_diff_context=get_env_int("FILE_DIFF_CONTEXT", 3)
+    )
+    
+    # Output configuration
+    output_config = AgentOutputConfig(
+        destination=OutputDestination.CONSOLE,  # Default, can be overridden
+        format=os.getenv("OUTPUT_FORMAT_TYPE", "text"),
+        max_length=get_env_int("MAX_OUTPUT_LENGTH") if os.getenv("MAX_OUTPUT_LENGTH") else None,
+        output_file=os.getenv("OUTPUT_FILE")
+    )
+    
+    # Prompt template
+    prompt_template = os.getenv("PROMPT_TEMPLATE", "Please process the following GitHub event.")
+    
+    return AgentDefinition(
+        agent=agent_dict,
+        configuration=configuration,
+        triggers=triggers,
+        prompt_template=prompt_template,
+        output=output_config,
+        enabled=True,
+        priority=0
+    )
+
+
+async def execute_single_agent(args: argparse.Namespace, settings: Settings) -> int:
+    """Execute a single agent from environment variables."""
+    logger = structlog.get_logger(__name__)
+    
+    try:
+        # Create agent definition from environment variables
+        agent_definition = create_agent_definition_from_env()
+        
+        # Determine event file path
+        event_file = args.event_file
+        if not event_file:
+            event_file = os.getenv('GITHUB_EVENT_PATH')
+            if not event_file:
+                if not args.quiet:
+                    print("Error: No event file specified and GITHUB_EVENT_PATH not set", file=sys.stderr)
+                return 1
+        
+        event_file = Path(event_file)
+        
+        # Load event data if file exists
+        event_data = {}
+        if event_file.exists():
+            try:
+                with open(event_file, 'r', encoding='utf-8') as f:
+                    event_data = json.load(f)
+            except json.JSONDecodeError as e:
+                if not args.quiet:
+                    print(f"Error: Invalid JSON in event file: {e}", file=sys.stderr)
+                return 1
+            except Exception as e:
+                if not args.quiet:
+                    print(f"Error: Failed to read event file: {e}", file=sys.stderr)
+                return 1
+        
+        # Create GitHub event object
+        github_event = GitHubEvent(**event_data)
+        
+        # Get GitHub Action context
+        github_context = GitHubActionContext(
+            event_name=os.getenv("GITHUB_EVENT_NAME", "unknown"),
+            workflow=os.getenv("GITHUB_WORKFLOW", "unknown"),
+            job=os.getenv("GITHUB_JOB", "unknown"),
+            run_id=os.getenv("GITHUB_RUN_ID", "0"),
+            run_number=int(os.getenv("GITHUB_RUN_NUMBER", "0")),
+            actor=os.getenv("GITHUB_ACTOR", "unknown"),
+            repository=os.getenv("GITHUB_REPOSITORY", "unknown"),
+            ref=os.getenv("GITHUB_REF", "refs/heads/main"),
+            sha=os.getenv("GITHUB_SHA", "unknown"),
+            workspace=os.getenv("WORKSPACE_PATH") or os.getenv("GITHUB_WORKSPACE", os.getcwd()),
+            server_url=os.getenv("GITHUB_SERVER_URL", "https://github.com"),
+            api_url=os.getenv("GITHUB_API_URL", "https://api.github.com"),
+            graphql_url=os.getenv("GITHUB_GRAPHQL_URL", "https://api.github.com/graphql")
+        )
+        
+        # Get commit history
+        from .event_handler import BaseEventHandler
+        base_handler = BaseEventHandler(settings)
+        commit_history = await base_handler._get_commit_history(
+            github_context, 
+            settings.git_commit_history_count
+        )
+        
+        # Execute the agent
+        agent_manager_instance = agent_manager
+        agent_manager_instance._github_token = settings.github_token
+        
+        result = await agent_manager_instance.execute_agent(
+            agent_definition,
+            github_event,
+            github_context,
+            commit_history
+        )
+        
+        # Prepare output data
+        output_data = {
+            "success": result.success,
+            "output": result.output or "",
+            "error": result.error or "",
+            "execution_time": result.execution_time,
+            "agent_name": result.agent_name,
+            "agent_type": result.agent_type.value,
+            "commit_history": commit_history.dict() if commit_history else None,
+            "files_changed": [fc.dict() for fc in (result.files_changed or [])],
+            "github_context": github_context.dict(),
+            "model_used": agent_definition.configuration.get("model"),
+            "tokens_used": result.metadata.get("tokens_used") if result.metadata else None,
+            "cost_usd": result.metadata.get("cost_usd") if result.metadata else None,
+            "session_id": result.metadata.get("session_id") if result.metadata else None,
+            "turns_used": result.metadata.get("turns_used") if result.metadata else None,
+            "output_file_path": agent_definition.output.output_file if agent_definition.output.output_file else None
+        }
+        
+        # Set GitHub Actions outputs
+        github_outputs_path = os.getenv("GITHUB_OUTPUT")
+        if github_outputs_path:
+            try:
+                with open(github_outputs_path, 'a', encoding='utf-8') as f:
+                    f.write(f"success={str(result.success).lower()}\n")
+                    f.write(f"output={result.output or ''}\n")
+                    f.write(f"error={result.error or ''}\n")
+                    f.write(f"execution-time={result.execution_time}\n")
+                    f.write(f"agent-name={result.agent_name}\n")
+                    f.write(f"agent-type={result.agent_type.value}\n")
+                    f.write(f"commit-history={json.dumps(commit_history.dict()) if commit_history else '{}'}\n")
+                    f.write(f"files-changed={json.dumps([fc.dict() for fc in (result.files_changed or [])])}\n")
+                    f.write(f"github-context={json.dumps(github_context.dict())}\n")
+                    
+                    # Optional metadata outputs
+                    if agent_definition.configuration.get("model"):
+                        f.write(f"model-used={agent_definition.configuration['model']}\n")
+                    if result.metadata and result.metadata.get("tokens_used"):
+                        f.write(f"tokens-used={result.metadata['tokens_used']}\n")
+                    if result.metadata and result.metadata.get("cost_usd"):
+                        f.write(f"cost-usd={result.metadata['cost_usd']}\n")
+                    if result.metadata and result.metadata.get("session_id"):
+                        f.write(f"session-id={result.metadata['session_id']}\n")
+                    if result.metadata and result.metadata.get("turns_used"):
+                        f.write(f"turns-used={result.metadata['turns_used']}\n")
+                    if agent_definition.output.output_file:
+                        f.write(f"output-file-path={agent_definition.output.output_file}\n")
+            except Exception as e:
+                logger.warning("Failed to write GitHub Actions outputs", error=str(e))
+        
+        # Write to output file if specified
+        if args.output_file:
+            try:
+                with open(args.output_file, 'w', encoding='utf-8') as f:
+                    json.dump(output_data, f, indent=2 if args.pretty else None)
+                logger.info("Output written to file", file=args.output_file)
+            except Exception as e:
+                logger.error("Failed to write output file", error=str(e))
+                return 1
+        
+        # Print output if not quiet
+        if not args.quiet:
+            if args.pretty:
+                print(json.dumps(output_data, indent=2))
+            else:
+                print(json.dumps(output_data))
+        
+        # Return appropriate exit code
+        return 0 if result.success else 1
+        
+    except Exception as e:
+        logger.error("Single agent execution failed", error=str(e))
+        
+        # Set GitHub Actions outputs for failure
+        github_outputs_path = os.getenv("GITHUB_OUTPUT")
+        if github_outputs_path:
+            try:
+                with open(github_outputs_path, 'a', encoding='utf-8') as f:
+                    f.write("success=false\n")
+                    f.write(f"error={str(e)}\n")
+                    f.write("execution-time=0\n")
+            except Exception:
+                pass
+        
+        if not args.quiet:
+            print(f"Error: {e}", file=sys.stderr)
+        return 1
 
 
 async def process_github_event(args: argparse.Namespace, settings: Settings) -> int:
@@ -845,6 +1141,8 @@ async def main():
             return show_statistics(args, settings)
         elif args.command == "agents":
             return await handle_agent_commands(args, settings)
+        elif args.command == "execute-agent":
+            return await execute_single_agent(args, settings)
         else:
             print(f"Unknown command: {args.command}", file=sys.stderr)
             return 1

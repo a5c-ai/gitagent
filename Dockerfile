@@ -203,4 +203,4 @@ RUN python3 -c "import gitagent; print('gitagent and dependencies installed succ
 RUN which claude
 
 # Default command
-CMD ["python3", "-m", "gitagent.main"] 
+CMD ["python3", "-m", "gitagent.main", "execute-agent"] 

@@ -29,109 +29,267 @@ branding:
   color: 'blue'
 
 inputs:
+  # Authentication & Core Configuration
   github-token:
-    description: 'GitHub personal access token for API access'
+    description: 'GitHub personal access token'
     required: false
     default: ${{ github.token }}
   
+  # Agent Definition - Core
+  agent-type:
+    description: 'Agent type (claude, claude_code_sdk, gemini, codex, custom)'
+    required: true
+  
+  agent-name:
+    description: 'Agent name for identification'
+    required: false
+    default: 'ai-agent'
+  
+  agent-description:
+    description: 'Agent description'
+    required: false
+    default: 'AI agent execution'
+  
+  agent-version:
+    description: 'Agent version'
+    required: false
+    default: '1.0.0'
+  
+  executable:
+    description: 'Executable path for custom agents'
+    required: false
+  
+  # Agent Configuration
+  model:
+    description: 'AI model to use'
+    required: false
+  
+  max-tokens:
+    description: 'Maximum tokens for response'
+    required: false
+    default: '4000'
+  
+  temperature:
+    description: 'Temperature for response generation'
+    required: false
+    default: '0.1'
+  
+  timeout-seconds:
+    description: 'Timeout for agent execution'
+    required: false
+    default: '300'
+  
+  # Claude Code SDK specific
+  max-turns:
+    description: 'Maximum conversation turns (Claude Code SDK)'
+    required: false
+    default: '5'
+  
+  system-prompt:
+    description: 'System prompt (Claude Code SDK)'
+    required: false
+  
+  append-system-prompt:
+    description: 'Additional system prompt (Claude Code SDK)'
+    required: false
+  
+  output-format:
+    description: 'Output format: text, json, stream-json (Claude Code SDK)'
+    required: false
+    default: 'text'
+  
+  permission-mode:
+    description: 'Permission mode: default, acceptEdits, bypassPermissions, plan (Claude Code SDK)'
+    required: false
+    default: 'default'
+  
+  allowed-tools:
+    description: 'Comma-separated list of allowed tools (Claude Code SDK)'
+    required: false
+  
+  disallowed-tools:
+    description: 'Comma-separated list of disallowed tools (Claude Code SDK)'
+    required: false
+  
+  use-bedrock:
+    description: 'Use Amazon Bedrock (Claude Code SDK)'
+    required: false
+    default: 'false'
+  
+  use-vertex:
+    description: 'Use Google Vertex AI (Claude Code SDK)'
+    required: false
+    default: 'false'
+  
+  # Prompt Template
+  prompt-template:
+    description: 'Prompt template with Jinja2 syntax'
+    required: true
+  
+  # File Context
+  include-file-content:
+    description: 'Include file content in context'
+    required: false
+    default: 'false'
+  
+  include-file-diff:
+    description: 'Include file diffs in context'
+    required: false
+    default: 'false'
+  
+  file-diff-context:
+    description: 'Number of context lines for diffs'
+    required: false
+    default: '3'
+  
+  # Output Configuration
+  output-file:
+    description: 'File path to write agent output'
+    required: false
+  
+  output-format-type:
+    description: 'Output format: text, markdown, json'
+    required: false
+    default: 'text'
+  
+  max-output-length:
+    description: 'Maximum output length'
+    required: false
+  
+  # API Keys
+  claude-api-key:
+    description: 'Anthropic Claude API key'
+    required: false
+  
+  gemini-api-key:
+    description: 'Google Gemini API key'
+    required: false
+  
+  openai-api-key:
+    description: 'OpenAI API key'
+    required: false
+  
+  anthropic-api-key:
+    description: 'Alternative Anthropic API key'
+    required: false
+  
+  # Processing Configuration
   log-level:
     description: 'Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)'
     required: false
     default: 'INFO'
   
-  log-format:
-    description: 'Log format (json, console)'
-    required: false
-    default: 'json'
-  
-  max-concurrent-events:
-    description: 'Maximum concurrent event processing'
-    required: false
-    default: '10'
-  
-  event-timeout:
-    description: 'Event processing timeout in seconds'
-    required: false
-    default: '30'
-  
-  background-tasks:
-    description: 'Enable background task processing'
-    required: false
-    default: 'true'
-  
-  metrics-enabled:
-    description: 'Enable metrics collection'
-    required: false
-    default: 'true'
-  
-  health-check-enabled:
-    description: 'Enable health check endpoints'
-    required: false
-    default: 'true'
-  
-  structured-logging:
-    description: 'Enable structured logging'
-    required: false
-    default: 'true'
-  
-  event-storage-enabled:
-    description: 'Enable event storage'
-    required: false
-    default: 'false'
-  
-  event-storage-path:
-    description: 'Path to store event data'
-    required: false
-    default: '/app/data/events'
-  
   git-commit-history-count:
-    description: 'Number of commits to retrieve for history context'
+    description: 'Number of commits to include in history context'
     required: false
     default: '10'
   
-  git-timeout:
-    description: 'Timeout for git operations in seconds'
+  workspace-path:
+    description: 'Custom workspace path'
     required: false
-    default: '30'
+
+outputs:
+  # Agent Execution Results
+  success:
+    description: 'Whether the agent executed successfully'
   
-  enabled-events:
-    description: 'Comma-separated list of enabled event types (empty means all events)'
-    required: false
-    default: ''
+  output:
+    description: 'Agent output content'
   
-  disabled-events:
-    description: 'Comma-separated list of disabled event types'
-    required: false
-    default: ''
+  error:
+    description: 'Error message if execution failed'
   
-  development-mode:
-    description: 'Enable development mode (exposes API docs and detailed errors)'
-    required: false
-    default: 'false'
+  execution-time:
+    description: 'Agent execution time in seconds'
   
-  # Agent Configuration
-  agents-enabled:
-    description: 'Enable AI agent processing'
-    required: false
-    default: 'true'
+  # Context Information
+  commit-history:
+    description: 'JSON object containing commit history context'
   
-  agents-directory:
-    description: 'Directory containing agent configuration files'
-    required: false
-    default: '.github/action-handlers'
+  files-changed:
+    description: 'JSON array of changed files with content/diffs'
   
-  # Agent CLI API Keys 
-  gemini-api-key:
-    description: 'Google Gemini API key'
-    required: false
-    default: ''
+  github-context:
+    description: 'GitHub Action context information'
   
-  openai-api-key:
-    description: 'OpenAI API key (used for both OpenAI and Codex agents)'
-    required: false
-    default: ''
+  # Agent Metadata
+  agent-name:
+    description: 'Name of the executed agent'
   
-  anthropic-api-key:
-    description: 'Anthropic API key'
-    required: false
-    default: ''
+  agent-type:
+    description: 'Type of the executed agent'
+  
+  model-used:
+    description: 'AI model that was used'
+  
+  tokens-used:
+    description: 'Number of tokens used (if available)'
+  
+  cost-usd:
+    description: 'Estimated cost in USD (if available)'
+  
+  # Claude Code SDK specific outputs
+  session-id:
+    description: 'Session ID for Claude Code SDK'
+  
+  turns-used:
+    description: 'Number of conversation turns used'
+  
+  # File outputs
+  output-file-path:
+    description: 'Path to the output file (if output-file was specified)'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    # Core configuration
+    GITHUB_TOKEN: ${{ inputs.github-token }}
+    LOG_LEVEL: ${{ inputs.log-level }}
+    GIT_COMMIT_HISTORY_COUNT: ${{ inputs.git-commit-history-count }}
+    WORKSPACE_PATH: ${{ inputs.workspace-path }}
+    
+    # Agent definition
+    AGENT_TYPE: ${{ inputs.agent-type }}
+    AGENT_NAME: ${{ inputs.agent-name }}
+    AGENT_DESCRIPTION: ${{ inputs.agent-description }}
+    AGENT_VERSION: ${{ inputs.agent-version }}
+    EXECUTABLE: ${{ inputs.executable }}
+    
+    # Agent configuration
+    MODEL: ${{ inputs.model }}
+    MAX_TOKENS: ${{ inputs.max-tokens }}
+    TEMPERATURE: ${{ inputs.temperature }}
+    TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
+    
+    # Claude Code SDK specific
+    MAX_TURNS: ${{ inputs.max-turns }}
+    SYSTEM_PROMPT: ${{ inputs.system-prompt }}
+    APPEND_SYSTEM_PROMPT: ${{ inputs.append-system-prompt }}
+    OUTPUT_FORMAT: ${{ inputs.output-format }}
+    PERMISSION_MODE: ${{ inputs.permission-mode }}
+    ALLOWED_TOOLS: ${{ inputs.allowed-tools }}
+    DISALLOWED_TOOLS: ${{ inputs.disallowed-tools }}
+    USE_BEDROCK: ${{ inputs.use-bedrock }}
+    USE_VERTEX: ${{ inputs.use-vertex }}
+    
+    # Prompt and context
+    PROMPT_TEMPLATE: ${{ inputs.prompt-template }}
+    INCLUDE_FILE_CONTENT: ${{ inputs.include-file-content }}
+    INCLUDE_FILE_DIFF: ${{ inputs.include-file-diff }}
+    FILE_DIFF_CONTEXT: ${{ inputs.file-diff-context }}
+    
+    # Output configuration
+    OUTPUT_FILE: ${{ inputs.output-file }}
+    OUTPUT_FORMAT_TYPE: ${{ inputs.output-format-type }}
+    MAX_OUTPUT_LENGTH: ${{ inputs.max-output-length }}
+    
+    # API keys
+    CLAUDE_API_KEY: ${{ inputs.claude-api-key }}
+    GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
+    OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+    ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+
+branding:
+  icon: 'cpu'
+  color: 'blue'
