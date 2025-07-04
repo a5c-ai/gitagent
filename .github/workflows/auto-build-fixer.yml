@@ -1,0 +1,218 @@
+name: Auto Build Fixer
+on:
+  workflow_run:
+    workflows: ["CI", "Build", "Test"]
+    types: [completed]
+    branches: [main, develop]
+
+permissions:
+  contents: write
+  actions: read
+  pull-requests: write
+
+jobs:
+  fix-build:
+    runs-on: ubuntu-latest
+    name: Fix Build Issues with Claude
+    if: github.event.workflow_run.conclusion == 'failure'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Download workflow artifacts
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+        continue-on-error: true
+
+      - name: Get workflow logs
+        id: get-logs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Get workflow run logs
+            const logs = await github.rest.actions.downloadWorkflowRunLogs({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: ${{ github.event.workflow_run.id }}
+            });
+            
+            // Save logs to a file
+            fs.writeFileSync('/tmp/workflow-logs.zip', Buffer.from(logs.data));
+            
+            // Extract logs (simplified approach)
+            const { execSync } = require('child_process');
+            try {
+              execSync('cd /tmp && unzip -q workflow-logs.zip', { stdio: 'inherit' });
+              const logFiles = execSync('find /tmp -name "*.txt" -type f', { encoding: 'utf8' }).trim().split('\n');
+              
+              let allLogs = '';
+              for (const logFile of logFiles) {
+                if (logFile && fs.existsSync(logFile)) {
+                  allLogs += `\n--- ${logFile} ---\n`;
+                  allLogs += fs.readFileSync(logFile, 'utf8');
+                }
+              }
+              
+              fs.writeFileSync('/tmp/build-logs.txt', allLogs);
+              console.log('Logs extracted successfully');
+            } catch (error) {
+              console.error('Failed to extract logs:', error);
+              fs.writeFileSync('/tmp/build-logs.txt', 'Failed to extract workflow logs');
+            }
+
+      - name: Run Build Fixer
+        uses: a5c-ai/gitagent@main
+        with:
+          agent-type: 'claude'
+          model: 'claude-3-sonnet-20241022'
+          max-tokens: 8000
+          temperature: 0.1
+          include-file-content: true
+          claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
+          prompt-template-file: 'prompts/auto-build-fixer.md'
+
+      - name: Create Fix Branch
+        id: create_branch
+        run: |
+          # Create branch name
+          BRANCH_NAME="auto-build-fix-$(date +%Y%m%d-%H%M%S)"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          
+          # Create and switch to new branch
+          git checkout -b $BRANCH_NAME
+          git config user.name "Auto Build Fixer"
+          git config user.email "auto-build-fixer@github-actions"
+
+      - name: Commit Build Fixes
+        run: |
+          # Add all changed files
+          git add -A
+          
+          # Check if there are changes to commit
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "🔧 Auto-fix build issues from workflow run ${{ github.event.workflow_run.id }}"
+            git push origin ${{ steps.create_branch.outputs.branch_name }}
+          fi
+
+      - name: Create Fix Pull Request
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const statusPath = '/tmp/build-fix-status.md';
+            const reportPath = '/tmp/build-fix-report.md';
+            
+            let statusContent = '';
+            let reportContent = '';
+            
+            if (fs.existsSync(statusPath)) {
+              statusContent = fs.readFileSync(statusPath, 'utf8');
+            }
+            
+            if (fs.existsSync(reportPath)) {
+              reportContent = fs.readFileSync(reportPath, 'utf8').substring(0, 1000);
+            }
+            
+            const pr = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔧 Auto-fix build failure from workflow run #${{ github.event.workflow_run.id }}`,
+              head: '${{ steps.create_branch.outputs.branch_name }}',
+              base: '${{ github.event.workflow_run.head_branch }}',
+              body: `## 🔧 Automated Build Fix
+              
+              This PR contains automated fixes for build failures detected in workflow run #${{ github.event.workflow_run.id }}.
+              
+              **Failed Workflow:** ${{ github.event.workflow_run.name }}
+              **Original Commit:** ${{ github.event.workflow_run.head_sha }}
+              **Branch:** ${{ github.event.workflow_run.head_branch }}
+              **Author:** @${{ github.event.workflow_run.actor.login }}
+              
+              ### Fix Summary
+              ${statusContent}
+              
+              ### Detailed Analysis
+              ${reportContent}...
+              
+              ### Verification
+              - [ ] Build passes locally
+              - [ ] Tests pass
+              - [ ] No regression in functionality
+              
+              ---
+              **Generated by:** Auto Build Fixer
+              **Workflow Run:** ${{ github.event.workflow_run.html_url }}
+              **Fix Report:** See \`/tmp/build-fix-report.md\` for full details
+              
+              ⚠️ **Please review carefully before merging**
+              `,
+              draft: true
+            });
+            
+            // Add labels
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.data.number,
+              labels: ['automated', 'build-fix', 'ci-cd', 'needs-review']
+            });
+            
+            // Add reviewers if configured
+            // await github.rest.pulls.requestReviewers({
+            //   owner: context.repo.owner,
+            //   repo: context.repo.repo,
+            //   pull_number: pr.data.number,
+            //   reviewers: ['tech-lead', 'devops-team']
+            // });
+
+      - name: Notify Original Author
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const statusPath = '/tmp/build-fix-status.md';
+            
+            let statusContent = '';
+            if (fs.existsSync(statusPath)) {
+              statusContent = fs.readFileSync(statusPath, 'utf8');
+            }
+            
+            // Create an issue to notify about the fix
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔧 Auto-fix applied for build failure in ${{ github.event.workflow_run.name }}`,
+              body: `## 🔧 Automated Build Fix Applied
+              
+              Hi @${{ github.event.workflow_run.actor.login }},
+              
+              Your recent commit caused a build failure in the **${{ github.event.workflow_run.name }}** workflow. I've analyzed the issue and created an automated fix.
+              
+              **Failed Workflow:** ${{ github.event.workflow_run.html_url }}
+              **Your Commit:** ${{ github.event.workflow_run.head_sha }}
+              **Branch:** ${{ github.event.workflow_run.head_branch }}
+              
+              ### Fix Summary
+              ${statusContent}
+              
+              ### Next Steps
+              I've created a draft PR with the proposed fix. Please review it and merge if it looks good:
+              - Check the automated changes
+              - Verify the fix addresses the root cause
+              - Test locally if possible
+              - Merge the fix PR
+              
+              ---
+              *This issue was automatically created by the Auto Build Fixer*
+              `,
+              labels: ['automated', 'build-fix', 'notification'],
+              assignees: ['${{ github.event.workflow_run.actor.login }}']
+            }); 

@@ -241,6 +241,8 @@ Examples:
 
 def create_agent_definition_from_env() -> AgentDefinition:
     """Create agent definition from environment variables."""
+    logger = structlog.get_logger(__name__)
+    
     def get_env_bool(key: str, default: bool = False) -> bool:
         """Get boolean value from environment variable."""
         value = os.getenv(key, str(default)).lower()
@@ -327,8 +329,24 @@ def create_agent_definition_from_env() -> AgentDefinition:
         output_file=os.getenv("OUTPUT_FILE")
     )
     
-    # Prompt template
-    prompt_template = os.getenv("PROMPT_TEMPLATE", "Please process the following GitHub event.")
+    # Prompt template - support both direct template and file path
+    prompt_template = os.getenv("PROMPT_TEMPLATE")
+    prompt_template_file = os.getenv("PROMPT_TEMPLATE_FILE")
+    
+    if prompt_template_file:
+        # Read prompt template from file
+        try:
+            with open(prompt_template_file, 'r', encoding='utf-8') as f:
+                prompt_template = f.read()
+        except FileNotFoundError:
+            logger.error(f"Prompt template file not found: {prompt_template_file}")
+            raise ValueError(f"Prompt template file not found: {prompt_template_file}")
+        except Exception as e:
+            logger.error(f"Failed to read prompt template file: {e}")
+            raise ValueError(f"Failed to read prompt template file: {e}")
+    
+    if not prompt_template:
+        prompt_template = "Please process the following GitHub event."
     
     return AgentDefinition(
         agent=agent_dict,

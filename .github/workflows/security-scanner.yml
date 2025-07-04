@@ -1,0 +1,109 @@
+name: Security Scanner
+on:
+  push:
+    branches: ["main", "develop"]
+    paths: ["*.py", "*.js", "*.ts", "*.go", "*.rs", "*.java", "src/**/*", "lib/**/*", "api/**/*"]
+  pull_request:
+    branches: ["main", "develop"]
+    paths: ["*.py", "*.js", "*.ts", "*.go", "*.rs", "*.java", "src/**/*", "lib/**/*", "api/**/*"]
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    name: Security Analysis with Claude
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Security Scanner
+        uses: a5c-ai/gitagent@main
+        with:
+          agent-type: 'claude'
+          model: 'claude-3-sonnet-20241022'
+          max-tokens: 6000
+          temperature: 0.1
+          include-file-content: true
+          include-file-diff: true
+          claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
+          prompt-template-file: 'prompts/security-scanner.md'
+
+      - name: Post Security Report
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = '/tmp/security-report.md';
+            
+            if (fs.existsSync(reportPath)) {
+              const report = fs.readFileSync(reportPath, 'utf8');
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 🔒 Security Analysis Report\n\n${report}\n\n---\n*Automated security analysis for commit ${context.sha.substring(0, 8)}*`
+              });
+            }
+
+      - name: Create Security Status Check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = '/tmp/security-report.md';
+            
+            let state = 'success';
+            let description = 'Security analysis completed - no issues found';
+            
+            if (fs.existsSync(reportPath)) {
+              const report = fs.readFileSync(reportPath, 'utf8');
+              
+              if (report.includes('🔥 CRITICAL')) {
+                state = 'failure';
+                description = 'Critical security vulnerabilities found';
+              } else if (report.includes('🚨 MAJOR ISSUES')) {
+                state = 'failure';
+                description = 'Major security issues identified';
+              } else if (report.includes('⚠️ MINOR ISSUES')) {
+                state = 'success';
+                description = 'Minor security improvements recommended';
+              }
+            }
+            
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: state,
+              description: description,
+              context: 'Security Scanner'
+            });
+
+      - name: Create Security Issue
+        if: github.event_name == 'push' && github.ref_name == 'main'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = '/tmp/security-report.md';
+            
+            if (fs.existsSync(reportPath)) {
+              const report = fs.readFileSync(reportPath, 'utf8');
+              
+              // Only create issue if significant security issues are found
+              if (report.includes('🔥 CRITICAL') || report.includes('🚨 MAJOR ISSUES')) {
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: `🔒 Security Issues Found - ${context.sha.substring(0, 8)}`,
+                  body: `## 🔒 Security Analysis Report\n\n${report}\n\n---\n*Automated security analysis for commit ${context.sha.substring(0, 8)}*\n\n⚠️ **This issue was automatically created due to significant security concerns.**`,
+                  labels: ['security', 'automated', 'high-priority']
+                });
+              }
+            } 

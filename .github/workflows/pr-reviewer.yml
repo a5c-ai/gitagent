@@ -1,0 +1,74 @@
+name: AI Code Review
+on:
+  pull_request:
+    branches: ["main", "develop"]
+    types: ["opened", "synchronize"]
+    paths: ["*.py", "*.js", "*.ts", "*.jsx", "*.tsx", "*.go", "*.rs", "src/**/*", "lib/**/*", "api/**/*"]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ai-code-review:
+    runs-on: ubuntu-latest
+    name: AI Code Review with Claude
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run AI Code Review
+        uses: a5c-ai/gitagent@main
+        with:
+          agent-type: 'claude'
+          model: 'claude-3-sonnet-20241022'
+          max-tokens: 4000
+          temperature: 0.2
+          include-file-content: true
+          include-file-diff: true
+          file-diff-context: 5
+          claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
+          prompt-template-file: 'prompts/pr-reviewer.md'
+
+      - name: Post Review Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '/tmp/pr-review-comment.md';
+            
+            if (fs.existsSync(path)) {
+              const review = fs.readFileSync(path, 'utf8');
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: review
+              });
+            }
+
+      - name: Commit Review Summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = `code-reviews/pr-${{ github.event.number }}-review.md`;
+            
+            if (fs.existsSync(path)) {
+              const content = fs.readFileSync(path, 'utf8');
+              
+              // Create directory if it doesn't exist
+              const { execSync } = require('child_process');
+              execSync('mkdir -p code-reviews', { stdio: 'inherit' });
+              
+              // Write the review summary
+              fs.writeFileSync(path, content);
+              
+              // Commit the file
+              execSync('git config user.name "AI Code Reviewer"');
+              execSync('git config user.email "ai-reviewer@github-actions"');
+              execSync(`git add ${path}`);
+              execSync(`git commit -m "📝 AI Code Review Summary for PR #${{ github.event.number }}" || echo "No changes to commit"`);
+              execSync('git push || echo "No changes to push"');
+            } 

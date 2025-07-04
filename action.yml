@@ -1,32 +1,6 @@
 name: 'gitagent'
 description: 'GitHub Action that executes AI-GitOps agents from the prompts in your repo'
 author: 'Tal Muskal'
-runs:
-  using: 'docker'
-  image: 'docker://ghcr.io/a5c-ai/gitagent:latest'
-  env:
-    GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
-    OPENAI_API_KEY: ${{ inputs.openai-api-key }}
-    ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
-    # EXECUTABLE_PATH: ${{ inputs.executable-path }}
-    # ADDITIONAL_ARGS: ${{ inputs.additional-args }}
-    # MODEL: ${{ inputs.model }}
-    # MAX_TOKENS: ${{ inputs.max-tokens }}
-    # TEMPERATURE: ${{ inputs.temperature }}
-    # BASE_URL: ${{ inputs.base-url }}
-  args:
-    - python3
-    - -m
-    - gitagent.main
-    - --log-level
-    - "${{ inputs.log-level }}"
-    - process
-
-
-  
-branding:
-  icon: 'activity'
-  color: 'blue'
 
 inputs:
   # Authentication & Core Configuration
@@ -123,8 +97,12 @@ inputs:
   
   # Prompt Template
   prompt-template:
-    description: 'Prompt template with Jinja2 syntax'
-    required: true
+    description: 'Prompt template with Jinja2 syntax (deprecated - use prompt-template-file instead)'
+    required: false
+  
+  prompt-template-file:
+    description: 'Path to prompt template file with Jinja2 syntax'
+    required: false
   
   # File Context
   include-file-content:
@@ -275,6 +253,7 @@ runs:
     
     # Prompt and context
     PROMPT_TEMPLATE: ${{ inputs.prompt-template }}
+    PROMPT_TEMPLATE_FILE: ${{ inputs.prompt-template-file }}
     INCLUDE_FILE_CONTENT: ${{ inputs.include-file-content }}
     INCLUDE_FILE_DIFF: ${{ inputs.include-file-diff }}
     FILE_DIFF_CONTEXT: ${{ inputs.file-diff-context }}

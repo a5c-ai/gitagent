@@ -1,0 +1,71 @@
+name: Gemini Simple Documentation Analyzer
+on:
+  push:
+    branches: ["main", "develop"]
+    paths: ["*.md", "*.txt", "*.rst", "*.py", "*.js", "docs/**/*", "README.md", "CHANGELOG.md"]
+  pull_request:
+    branches: ["main", "develop"]
+    paths: ["*.md", "*.txt", "*.rst", "*.py", "*.js", "docs/**/*", "README.md", "CHANGELOG.md"]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  gemini-doc-analysis:
+    runs-on: ubuntu-latest
+    name: Analyze Documentation with Gemini
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Gemini Documentation Analysis
+        uses: a5c-ai/gitagent@main
+        with:
+          agent-type: 'gemini'
+          model: 'gemini-2.5-flash'
+          max-tokens: 3000
+          temperature: 0.3
+          include-file-content: true
+          gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
+          prompt-template-file: 'prompts/gemini-simple-analyzer.md'
+
+      - name: Post Analysis Comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '/tmp/gemini-doc-analysis.md';
+            
+            if (fs.existsSync(path)) {
+              const analysis = fs.readFileSync(path, 'utf8');
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 📝 Documentation Analysis by Gemini\n\n${analysis}\n\n---\n*Automated analysis for commit ${context.sha.substring(0, 8)}*`
+              });
+            }
+
+      - name: Create Issue for Documentation Improvements
+        if: github.event_name == 'push' && github.ref_name == 'main'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '/tmp/gemini-doc-analysis.md';
+            
+            if (fs.existsSync(path)) {
+              const analysis = fs.readFileSync(path, 'utf8');
+              
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `📝 Documentation Analysis - ${context.sha.substring(0, 8)}`,
+                body: `## 📝 Documentation Analysis by Gemini\n\n${analysis}\n\n---\n*Automated analysis for commit ${context.sha.substring(0, 8)}*`,
+                labels: ['documentation', 'ai-analysis', 'gemini']
+              });
+            } 
