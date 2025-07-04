@@ -134,8 +134,9 @@ class ClaudeCodeSDKExecutor:
                 options_dict["system_prompt"] = agent.configuration["system_prompt"]
             if "append_system_prompt" in agent.configuration:
                 options_dict["append_system_prompt"] = agent.configuration["append_system_prompt"]
-            if "temperature" in agent.configuration:
-                options_dict["temperature"] = agent.configuration["temperature"]
+            # Note: temperature is not supported by ClaudeCodeOptions
+            # if "temperature" in agent.configuration:
+            #     options_dict["temperature"] = agent.configuration["temperature"]
             if "max_tokens" in agent.configuration:
                 options_dict["max_tokens"] = agent.configuration["max_tokens"]
         
