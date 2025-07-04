@@ -13,7 +13,7 @@ permissions:
 jobs:
   fix-build:
     runs-on: ubuntu-latest
-    name: Fix Build Issues with Claude
+    name: Fix Build Issues with Claude    
     if: github.event.workflow_run.conclusion == 'failure'
     steps:
       - name: Checkout repository

@@ -22,7 +22,6 @@ from .models import (
     GitHubActionContext, 
     AgentDefinition, 
     AgentType,
-    AgentTriggers,
     AgentOutputConfig,
     OutputDestination
 )
