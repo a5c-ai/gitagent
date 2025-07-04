@@ -643,14 +643,19 @@ class AgentManager:
         max_tokens = os.getenv("MAX_TOKENS", "")
         temperature = os.getenv("TEMPERATURE", "")
         base_url = os.getenv("BASE_URL", "")
-        timeout_seconds = os.getenv("TIMEOUT_SECONDS", 900)
+        timeout_seconds = int(os.getenv("TIMEOUT_SECONDS", 900))
         additional_args = []
+        use_stdin = True  # Flag to determine if we should use stdin
+        
         if agent_type == "claude":
             executable_path = "/usr/bin/claude"
-            additional_args = ["-d", "--model", "sonnet","--dangerously-skip-permissions",prompt]
+            # Claude CLI expects input via stdin, not as arguments
+            # Use non-interactive mode with appropriate flags
+            additional_args = ["--no-interactive", "--model", "claude-3-5-sonnet-20241022"]
         elif agent_type == "gemini":
             executable_path = "gemini"            
             additional_args = ["-y" ,"--model", "gemini-2.0-flash","-p",prompt]
+            use_stdin = False  # Gemini uses prompt as argument
         elif agent_type == "codex":
             executable_path = "codex"
             # additional_args = ["--api-key", env_vars["OPENAI_API_KEY"]]
@@ -659,20 +664,20 @@ class AgentManager:
         cmd.extend(additional_args)
         
         # Add model if specified
-        if model:
-            cmd.extend(['--model', model])
+        # if model:
+        #     cmd.extend(['--model', model])
         
-        # Add max tokens if specified
-        if max_tokens:
-            cmd.extend(['--max-tokens', str(max_tokens)])
+        # # Add max tokens if specified
+        # if max_tokens:
+        #     cmd.extend(['--max-tokens', str(max_tokens)])
         
-        # Add temperature if specified
-        if temperature is not None:
-            cmd.extend(['--temperature', str(temperature)])
+        # # Add temperature if specified
+        # if temperature is not None:
+        #     cmd.extend(['--temperature', str(temperature)])
         
-        # Add base URL if specified
-        if base_url:
-            cmd.extend(['--base-url', base_url])
+        # # Add base URL if specified
+        # if base_url:
+        #     cmd.extend(['--base-url', base_url])
         
         # Add agent-specific configuration
         for key, value in agent.configuration.items():
@@ -696,13 +701,23 @@ class AgentManager:
                 env=env
             )
             
+            # Only send prompt via stdin if use_stdin is True
+            input_data = prompt.encode('utf-8') if use_stdin else None
             stdout, stderr = await asyncio.wait_for(
-                process.communicate(input=prompt.encode('utf-8')),
+                process.communicate(input=input_data),
                 timeout=timeout_seconds
             )
             
             if process.returncode != 0:
                 error_msg = stderr.decode('utf-8') if stderr else f"Process exited with code {process.returncode}"
+                logger.error(
+                    "CLI command failed",
+                    agent=agent.agent.get('name', 'unknown'),
+                    command=cmd[0],
+                    return_code=process.returncode,
+                    stderr=error_msg,
+                    stdout=stdout.decode('utf-8') if stdout else None
+                )
                 raise subprocess.CalledProcessError(process.returncode, cmd[0], stderr=error_msg)
             
             return stdout.decode('utf-8')
