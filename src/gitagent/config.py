@@ -86,7 +86,10 @@ class Settings(BaseSettings):
     max_concurrent_events: int = Field(default=10, description="Maximum concurrent event processing")
     event_timeout_seconds: int = Field(default=30, description="Event processing timeout")
     background_tasks: bool = Field(default=True, description="Enable background task processing")
-    commit_history_count: int = Field(default=10, description="Number of commits to retrieve for context")
+    commit_history_count: int = Field(
+        default_factory=lambda: int(os.getenv("GIT_COMMIT_HISTORY_COUNT", "10")), 
+        description="Number of commits to retrieve for context"
+    )
     
     # Feature Toggles
     metrics_enabled: bool = Field(default=True, description="Enable metrics collection")

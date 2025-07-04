@@ -34,19 +34,6 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir .
 
-# Install AI CLI tools
-# RUN npm i -g @openai/codex@native
-
-# RUN npm i -g @anthropic-ai/claude-code
-
-# RUN npm i -g @google/gemini-cli
-
-# Create CLI tools directory and set up symlinks for easier access
-RUN mkdir -p /opt/cli-tools/bin && \
-    ln -s /usr/bin/codex /opt/cli-tools/bin/codex && \
-    ln -s /opt/venv/bin/anthropic-cli /opt/cli-tools/bin/claude && \
-    ln -s /opt/venv/bin/gemini-cli /opt/cli-tools/bin/gemini
-
 # Production stage
 FROM ubuntu:noble AS production
 

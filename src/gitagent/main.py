@@ -410,7 +410,7 @@ async def execute_single_agent(args: argparse.Namespace, settings: Settings) -> 
         base_handler = BaseEventHandler(settings)
         commit_history = await base_handler._get_commit_history(
             github_context, 
-            settings.git_commit_history_count
+            settings.commit_history_count
         )
         
         # Execute the agent
@@ -735,8 +735,8 @@ def validate_configuration(args: argparse.Namespace, settings: Settings) -> int:
                 issues.append(f"GitHub workspace not found: {workspace_path}")
         
         # Check git commit history count
-        if not (1 <= settings.git_commit_history_count <= 100):
-            issues.append(f"Invalid git_commit_history_count: {settings.git_commit_history_count} (must be 1-100)")
+        if not (1 <= settings.commit_history_count <= 100):
+            issues.append(f"Invalid commit_history_count: {settings.commit_history_count} (must be 1-100)")
         
         # Check event storage
         if settings.event_storage_enabled:
