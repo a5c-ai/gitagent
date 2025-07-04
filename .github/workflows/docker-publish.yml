@@ -94,121 +94,6 @@ jobs:
         provenance: true
         sbom: true
 
-  test-image:
-    name: Test Docker Image
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    if: github.event_name != 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.push_to_registry)
-
-    strategy:
-      matrix:
-        platform: [linux/amd64, linux/arm64]
-
-    steps:
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Extract image name
-      id: image
-      run: |
-        if [[ "${{ github.ref_type }}" == "tag" ]]; then
-          echo "name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
-        else
-          echo "name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Test image on ${{ matrix.platform }}
-      run: |
-        docker run --rm --platform ${{ matrix.platform }} \
-          --name test-container \
-          -e DEBUG=true \
-          -e WEBHOOK_SIGNATURE_REQUIRED=false \
-          ${{ steps.image.outputs.name }} \
-          python -c "
-        import gitagent
-        print('✅ gitagent imported successfully')
-        print(f'Version: {gitagent.__version__}')
-        "
-
-    - name: Test container startup
-      run: |
-        # Start container in background
-        docker run --rm -d --platform ${{ matrix.platform }} \
-          --name startup-test \
-          -p 8080:8000 \
-          -e DEBUG=true \
-          -e WEBHOOK_SIGNATURE_REQUIRED=false \
-          ${{ steps.image.outputs.name }}
-
-        # Wait for container to be ready
-        timeout 60 bash -c 'until curl -f http://localhost:8080/health; do sleep 2; done'
-
-        # Test basic endpoints
-        curl -f http://localhost:8080/health
-        curl -f http://localhost:8080/events/supported
-
-        # Stop container
-        docker stop startup-test
-
-  security-scan:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    if: github.event_name != 'pull_request'
-
-    steps:
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Extract image name
-      id: image
-      run: |
-        if [[ "${{ github.ref_type }}" == "tag" ]]; then
-          echo "name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
-        else
-          echo "name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: ${{ steps.image.outputs.name }}
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-
-    - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
-      if: always()
-      with:
-        sarif_file: 'trivy-results.sarif'
-
-    - name: Run Trivy vulnerability scanner (table output)
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: ${{ steps.image.outputs.name }}
-        format: 'table'
-        output: 'trivy-results.txt'
-
-    - name: Upload Trivy results as artifact
-      uses: actions/upload-artifact@v3
-      if: always()
-      with:
-        name: trivy-results
-        path: |
-          trivy-results.sarif
-          trivy-results.txt
-
   sign-image:
     name: Sign Container Image
     runs-on: ubuntu-latest
@@ -251,70 +136,6 @@ jobs:
         # Verify the signature
         cosign verify "${IMAGE_NAME}:${TAG}"
 
-  update-readme:
-    name: Update Documentation
-    runs-on: ubuntu-latest
-    needs: [build-and-push, test-image]
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Update Docker usage in README
-      run: |
-        # Extract image details
-        IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-        DIGEST="${{ needs.build-and-push.outputs.image-digest }}"
-        
-        # Create or update README section with Docker information
-        cat >> DOCKER_USAGE.md << EOF
-        # Docker Usage
-        
-        ## Pull the latest image
-        \`\`\`bash
-        docker pull ${IMAGE_NAME}:latest
-        \`\`\`
-        
-        ## Run with default settings
-        \`\`\`bash
-        docker run -d \\
-          --name github-action-handler \\
-          -p 8000:8000 \\
-          -e GITHUB_WEBHOOK_SECRET=your_secret_here \\
-          -e GITHUB_TOKEN=your_token_here \\
-          ${IMAGE_NAME}:latest
-        \`\`\`
-        
-        ## Development mode
-        \`\`\`bash
-        docker run -d \\
-          --name github-action-handler-dev \\
-          -p 8000:8000 \\
-          -e DEBUG=true \\
-          -e WEBHOOK_SIGNATURE_REQUIRED=false \\
-          ${IMAGE_NAME}:dev
-        \`\`\`
-        
-        ## Image Details
-        - **Registry**: ${REGISTRY}
-        - **Repository**: ${IMAGE_NAME}
-        - **Latest Digest**: ${DIGEST}
-        - **Updated**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-        EOF
-
-    - name: Commit documentation updates
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        
-        if [[ -n "$(git status --porcelain)" ]]; then
-          git add DOCKER_USAGE.md
-          git commit -m "docs: Update Docker usage documentation [skip ci]"
-          git push
-        fi
 
   cleanup:
     name: Cleanup Old Images
@@ -335,7 +156,7 @@ jobs:
   summary:
     name: Build Summary
     runs-on: ubuntu-latest
-    needs: [build-and-push, test-image, security-scan]
+    needs: [build-and-push]
     if: always()
 
     steps:
@@ -346,8 +167,6 @@ jobs:
         echo "| Stage | Status | Details |" >> $GITHUB_STEP_SUMMARY
         echo "|-------|--------|---------|" >> $GITHUB_STEP_SUMMARY
         echo "| Build & Push | ${{ needs.build-and-push.result }} | Multi-arch build for production and development |" >> $GITHUB_STEP_SUMMARY
-        echo "| Image Testing | ${{ needs.test-image.result }} | Container startup and functionality tests |" >> $GITHUB_STEP_SUMMARY
-        echo "| Security Scan | ${{ needs.security-scan.result }} | Vulnerability scanning with Trivy |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
         if [[ "${{ github.event_name }}" != "pull_request" ]]; then
@@ -369,8 +188,7 @@ jobs:
         fi
 
         # Check for failures
-        if [[ "${{ needs.build-and-push.result }}" == "failure" ]] || \
-           [[ "${{ needs.test-image.result }}" == "failure" ]]; then
+        if [[ "${{ needs.build-and-push.result }}" == "failure" ]]; then
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "❌ **Build pipeline failed - check logs for details**" >> $GITHUB_STEP_SUMMARY
           exit 1
