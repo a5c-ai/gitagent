@@ -26,8 +26,6 @@ agent:
 
 configuration:
   model: "claude-3-sonnet-20241022"
-  max_tokens: 4000
-  temperature: 0.2
 
 triggers:
   branches: ["main", "develop"]
@@ -73,8 +71,6 @@ jobs:
         with:
           agent-type: 'claude'
           model: 'claude-3-sonnet-20241022'
-          max-tokens: 4000
-          temperature: 0.2
           claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
           prompt-template: |
             Your prompt here...
@@ -98,8 +94,6 @@ agent:
 
 configuration:
   model: "gemini-2.5-flash"
-  max_tokens: 3000
-  temperature: 0.3
 
 triggers:
   branches: ["main", "develop"]
@@ -142,8 +136,6 @@ jobs:
         with:
           agent-type: 'gemini'
           model: 'gemini-2.5-flash'
-          max-tokens: 3000
-          temperature: 0.3
           include-file-content: true
           gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
           prompt-template: |
@@ -179,8 +171,6 @@ agent:
 
 configuration:
   model: "claude-3-sonnet-20241022"
-  max_tokens: 4000
-  temperature: 0.2
 
 triggers:
   branches: ["main", "develop"]
@@ -221,8 +211,6 @@ jobs:
         with:
           agent-type: 'claude'
           model: 'claude-3-sonnet-20241022'
-          max-tokens: 4000
-          temperature: 0.2
           include-file-content: true
           include-file-diff: true
           claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
@@ -258,8 +246,6 @@ agent:
 
 configuration:
   model: "claude-3-sonnet-20241022"
-  max_tokens: 6000
-  temperature: 0.1
 
 triggers:
   branches: ["main", "develop"]
@@ -303,8 +289,6 @@ jobs:
         with:
           agent-type: 'claude'
           model: 'claude-3-sonnet-20241022'
-          max-tokens: 6000
-          temperature: 0.1
           include-file-content: true
           claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
           prompt-template: |
@@ -353,8 +337,6 @@ agent:
 
 configuration:
   model: "claude-3-sonnet-20241022"
-  max_tokens: 4000
-  temperature: 0.1
 
 triggers:
   branches: ["main", "develop"]
@@ -400,8 +382,6 @@ jobs:
         with:
           agent-type: 'claude-code-sdk'
           model: 'claude-3-sonnet-20241022'
-          max-tokens: 4000
-          temperature: 0.1
           max-turns: 10
           permission-mode: 'ask'
           allowed-tools: 'read_file,edit_file,grep_search,run_terminal_cmd'
@@ -435,8 +415,6 @@ agent:
 
 configuration:
   model: "claude-3-sonnet-20241022"
-  max_tokens: 8000
-  temperature: 0.1
 
 triggers:
   branches: ["main", "develop"]
@@ -483,8 +461,6 @@ jobs:
         with:
           agent-type: 'claude'
           model: 'claude-3-sonnet-20241022'
-          max-tokens: 8000
-          temperature: 0.1
           include-file-content: true
           claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
           prompt-template: |
@@ -543,8 +519,6 @@ agent:
 
 configuration:
   model: "claude-3-sonnet-20241022"
-  max_tokens: 6000
-  temperature: 0.2
 
 triggers:
   event_actions: ["opened", "edited"]
@@ -581,7 +555,6 @@ jobs:
           agent-type: 'claude'
           model: 'claude-3-sonnet-20241022'
           max-tokens: 6000
-          temperature: 0.2
           claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
           prompt-template: |
             ## Issue Context
@@ -623,8 +596,6 @@ agent:
 
 configuration:
   model: "claude-3-sonnet-20241022"
-  max_tokens: 8000
-  temperature: 0.1
 
 triggers:
   workflow_names: ["CI", "Build", "Test"]
@@ -676,8 +647,6 @@ jobs:
         with:
           agent-type: 'claude'
           model: 'claude-3-sonnet-20241022'
-          max-tokens: 8000
-          temperature: 0.1
           claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
           prompt-template: |
             ## Workflow Context

@@ -22,8 +22,6 @@ jobs:
         with:
           agent-type: 'claude'
           model: 'claude-3-sonnet-20241022'
-          max-tokens: 4000
-          temperature: 0.2
           include-file-content: true
           include-file-diff: true
           file-diff-context: 5

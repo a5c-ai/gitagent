@@ -41,7 +41,6 @@ agent:
 
 configuration:
   model: "claude-3-sonnet-20241022"
-  max_tokens: 4000
 
 triggers:
   branches: ["main", "develop"]
@@ -78,7 +77,6 @@ jobs:
         with:
           agent-type: claude        # ← From agent.type
           model: claude-3-sonnet-20241022  # ← From configuration.model
-          max-tokens: 4000          # ← From configuration.max_tokens
           include-file-content: true # ← From triggers.include_file_content
           
           prompt-template: |        # ← From prompt_template

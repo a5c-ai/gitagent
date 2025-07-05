@@ -42,8 +42,6 @@ jobs:
           agent-type: 'claude'
           agent-name: 'code-reviewer'
           model: 'claude-3-sonnet-20241022'
-          max-tokens: 4000
-          temperature: 0.1
           
           include-file-content: true
           include-file-diff: true
@@ -153,8 +151,6 @@ jobs:
   with:
     agent-type: 'claude'
     model: 'claude-3-sonnet-20241022'
-    max-tokens: 4000
-    temperature: 0.1
     prompt-template: |
       Analyze the following code changes...
     claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
@@ -187,8 +183,6 @@ jobs:
   with:
     agent-type: 'gemini'
     model: 'gemini-2.0-flash'
-    max-tokens: 3000
-    temperature: 0.2
     prompt-template: |
       Analyze the following code...
     gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
@@ -202,8 +196,6 @@ jobs:
   with:
     agent-type: 'codex'
     model: 'gpt-4'
-    max-tokens: 2000
-    temperature: 0.1
     prompt-template: |
       Review the following code...
     openai-api-key: ${{ secrets.OPENAI_API_KEY }}
@@ -218,8 +210,6 @@ jobs:
 | `agent-type` | Agent type: `claude`, `claude_code_sdk`, `gemini`, `codex`, `custom` | | ✅ |
 | `agent-name` | Agent name for identification | `ai-agent` | |
 | `model` | AI model to use | | |
-| `max-tokens` | Maximum tokens for response | `4000` | |
-| `temperature` | Response randomness (0.0-1.0) | `0.1` | |
 | `timeout-seconds` | Timeout for agent execution | `300` | |
 | `prompt-template` | Jinja2 prompt template | | ✅ |
 

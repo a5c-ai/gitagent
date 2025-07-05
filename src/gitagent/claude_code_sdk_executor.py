@@ -70,7 +70,6 @@ class ClaudeCodeSDKExecutor:
             "Executing Claude Code SDK agent",
             agent=agent_name,
             prompt_length=len(prompt),
-            max_tokens=self.config.max_tokens,
             model=self.config.model
         )
         
@@ -134,12 +133,7 @@ class ClaudeCodeSDKExecutor:
                 options_dict["system_prompt"] = agent.configuration["system_prompt"]
             if "append_system_prompt" in agent.configuration:
                 options_dict["append_system_prompt"] = agent.configuration["append_system_prompt"]
-            # Note: temperature is not supported by ClaudeCodeOptions
-            # if "temperature" in agent.configuration:
-            #     options_dict["temperature"] = agent.configuration["temperature"]
-            if "max_tokens" in agent.configuration:
-                options_dict["max_tokens"] = agent.configuration["max_tokens"]
-        
+
         # Add tool configurations
         if self.config.allowed_tools:
             options_dict["allowed_tools"] = self.config.allowed_tools
@@ -320,7 +314,6 @@ class ClaudeCodeSDKExecutor:
                 "sdk_available": True,
                 "configuration": {
                     "model": self.config.model,
-                    "max_tokens": self.config.max_tokens,
                     "timeout_seconds": self.config.timeout_seconds,
                     "use_bedrock": self.config.use_bedrock,
                     "use_vertex": self.config.use_vertex,
@@ -334,7 +327,6 @@ class ClaudeCodeSDKExecutor:
                 "sdk_available": False,
                 "configuration": {
                     "model": self.config.model,
-                    "max_tokens": self.config.max_tokens,
                     "timeout_seconds": self.config.timeout_seconds,
                     "use_bedrock": self.config.use_bedrock,
                     "use_vertex": self.config.use_vertex,

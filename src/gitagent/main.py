@@ -286,10 +286,6 @@ def create_agent_definition_from_env() -> AgentDefinition:
     # Basic configuration
     if os.getenv("MODEL"):
         configuration["model"] = os.getenv("MODEL")
-    if os.getenv("MAX_TOKENS"):
-        configuration["max_tokens"] = get_env_int("MAX_TOKENS")
-    if os.getenv("TEMPERATURE"):
-        configuration["temperature"] = get_env_float("TEMPERATURE")
     if os.getenv("TIMEOUT_SECONDS"):
         configuration["timeout_seconds"] = get_env_int("TIMEOUT_SECONDS")
     

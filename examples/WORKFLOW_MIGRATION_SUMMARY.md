@@ -172,8 +172,6 @@ This document provides a comprehensive overview of all migrated agent workflows 
   with:
     agent-type: 'claude'
     model: 'claude-3-sonnet-20241022'
-    max-tokens: 4000
-    temperature: 0.2
     claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
     prompt-template: |
       Your analysis task...
@@ -186,8 +184,6 @@ This document provides a comprehensive overview of all migrated agent workflows 
   with:
     agent-type: 'claude-code-sdk'
     model: 'claude-3-sonnet-20241022'
-    max-tokens: 8000
-    temperature: 0.1
     max-turns: 10
     permission-mode: 'ask'
     allowed-tools: 'read_file,edit_file,grep_search,run_terminal_cmd'

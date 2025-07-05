@@ -11,9 +11,6 @@ runs:
     # EXECUTABLE_PATH: ${{ inputs.executable-path }}
     # ADDITIONAL_ARGS: ${{ inputs.additional-args }}
     # MODEL: ${{ inputs.model }}
-    # MAX_TOKENS: ${{ inputs.max-tokens }}
-    # TEMPERATURE: ${{ inputs.temperature }}
-    # BASE_URL: ${{ inputs.base-url }}
     GITHUB_TOKEN: ${{ inputs.github-token }}
     LOG_LEVEL: ${{ inputs.log-level }}
     GIT_COMMIT_HISTORY_COUNT: ${{ inputs.git-commit-history-count }}
@@ -34,8 +31,6 @@ runs:
     
     # Agent configuration
     MODEL: ${{ inputs.model }}
-    MAX_TOKENS: ${{ inputs.max-tokens }}
-    TEMPERATURE: ${{ inputs.temperature }}
     TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
     
     # Claude Code SDK specific
@@ -104,15 +99,6 @@ inputs:
     description: 'AI model to use'
     required: false
   
-  max-tokens:
-    description: 'Maximum tokens for response'
-    required: false
-    default: '4000'
-  
-  temperature:
-    description: 'Temperature for response generation'
-    required: false
-    default: '0.1'
   
   timeout-seconds:
     description: 'Timeout for agent execution'

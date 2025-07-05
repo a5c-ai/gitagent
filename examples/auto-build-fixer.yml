@@ -71,8 +71,6 @@ jobs:
         with:
           agent-type: 'claude'
           model: 'claude-3-sonnet-20241022'
-          max-tokens: 8000
-          temperature: 0.1
           include-file-content: true
           claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
           prompt-template-file: 'prompts/auto-build-fixer.md'

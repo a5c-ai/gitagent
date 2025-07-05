@@ -29,8 +29,6 @@ agent:
 
 configuration:
   model: "claude-3-sonnet-20241022"
-  max_tokens: 4000
-  temperature: 0.1
 
 triggers:
   branches: ["main", "develop"]
@@ -86,8 +84,6 @@ jobs:
           agent-name: 'code-reviewer'
           agent-description: 'Automated code reviewer'
           model: 'claude-3-sonnet-20241022'
-          max-tokens: 4000
-          temperature: 0.1
           
           # File context
           include-file-content: true
@@ -148,7 +144,6 @@ agent:
 
 configuration:
   model: "gemini-2.0-flash"
-  max_tokens: 3000
 
 triggers:
   branches: ["main"]
@@ -245,7 +240,6 @@ agent:
 
 configuration:
   model: "claude-3-sonnet-20241022"
-  max_tokens: 8000
   max_turns: 10
   permission_mode: "acceptEdits"
   allowed_tools: ["file_editor", "bash"]

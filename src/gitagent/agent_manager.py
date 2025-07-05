@@ -640,8 +640,6 @@ class AgentManager:
         
         additional_args = os.getenv("ADDITIONAL_ARGS", "")
         model = os.getenv("MODEL", "")
-        max_tokens = os.getenv("MAX_TOKENS", "")
-        temperature = os.getenv("TEMPERATURE", "")
         base_url = os.getenv("BASE_URL", "")
         timeout_seconds = int(os.getenv("TIMEOUT_SECONDS", 900))
         additional_args = []
@@ -667,13 +665,6 @@ class AgentManager:
         # if model:
         #     cmd.extend(['--model', model])
         
-        # # Add max tokens if specified
-        # if max_tokens:
-        #     cmd.extend(['--max-tokens', str(max_tokens)])
-        
-        # # Add temperature if specified
-        # if temperature is not None:
-        #     cmd.extend(['--temperature', str(temperature)])
         
         # # Add base URL if specified
         # if base_url:
